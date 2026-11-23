@@ -1,0 +1,225 @@
+{
+ "_readme": "Launch catalog. Every course listed here is uploaded to Supabase Storage and published on each production deploy (scripts/sync-courses.mjs). Add a course: put its bilingual.html in courses/lottie/<slug>/ and list the slug here.",
+ "courses": [
+  "harassment-prevention",
+  "harassment-prevention-ca",
+  "harassment-prevention-ca-supervisors",
+  "harassment-prevention-ny",
+  "harassment-prevention-nyc",
+  "harassment-prevention-il",
+  "harassment-prevention-ct",
+  "harassment-prevention-refresher",
+  "workplace-violence",
+  "workplace-violence-ca",
+  "workplace-violence-ny-retail",
+  "osha-rights",
+  "hazard-communication",
+  "emergency-action-plans",
+  "fire-safety",
+  "slips-trips-falls",
+  "safe-lifting-ergonomics",
+  "ppe",
+  "bloodborne-pathogens",
+  "code-of-conduct",
+  "cybersecurity-phishing",
+  "data-privacy",
+  "screening-new-clients",
+  "coaching-beginners-disabilities",
+  "preventing-client-injuries",
+  "fitness-emergency-response",
+  "scope-of-practice-fitness",
+  "hands-on-cues-consent",
+  "inclusive-coaching-every-body",
+  "professional-boundaries-fitness",
+  "gym-tours-trials-first-visit",
+  "membership-sales-no-pressure",
+  "gym-cancellations-freezes",
+  "billing-disputes-refunds",
+  "member-retention-first-90-days",
+  "customer-service-basics",
+  "customer-goes-off",
+  "card-payment-safety",
+  "gym-equipment-floor-safety",
+  "equipment-checks-repair-reports",
+  "pool-hot-tub-sauna-safety",
+  "locker-room-privacy",
+  "kids-club-child-watch",
+  "opening-closing-alone",
+  "gym-cleaning-sanitation",
+  "food-safety-allergens",
+  "food-handler-hygiene",
+  "food-allergy-orders",
+  "kitchen-knife-burn-safety",
+  "cleaning-chemical-safety",
+  "alcohol-id-checks",
+  "wage-hour-basics",
+  "harassment-prevention-il-restaurants",
+  "security-theft-awareness",
+  "leading-friends",
+  "running-a-great-shift",
+  "setting-expectations",
+  "training-on-the-job",
+  "giving-feedback",
+  "recognizing-good-work",
+  "delegating-tasks",
+  "accountability-talks",
+  "safety-huddle",
+  "injury-report"
+ ],
+ "packs": [
+  {
+   "slug": "workplace-essentials",
+   "title": "Workplace Essentials",
+   "title_es": "Lo esencial del trabajo",
+   "industry": "any",
+   "description": "Harassment, workplace violence, core OSHA safety, conduct and cyber. For every team.",
+   "paths": {
+    "core": [
+     "harassment-prevention",
+     "harassment-prevention-ca",
+     "harassment-prevention-ca-supervisors",
+     "harassment-prevention-ny",
+     "harassment-prevention-nyc",
+     "harassment-prevention-il",
+     "harassment-prevention-ct",
+     "harassment-prevention-refresher",
+     "workplace-violence",
+     "workplace-violence-ca",
+     "workplace-violence-ny-retail",
+     "osha-rights",
+     "hazard-communication",
+     "emergency-action-plans",
+     "fire-safety",
+     "slips-trips-falls",
+     "safe-lifting-ergonomics",
+     "ppe",
+     "bloodborne-pathogens",
+     "code-of-conduct",
+     "cybersecurity-phishing",
+     "data-privacy"
+    ]
+   }
+  },
+  {
+   "slug": "fitness-gyms",
+   "title": "Fitness and Gyms",
+   "title_es": "Gimnasios y fitness",
+   "industry": "fitness",
+   "description": "Role paths for trainers, front desk and facility staff, plus shift leads.",
+   "paths": {
+    "trainers": [
+     "screening-new-clients",
+     "coaching-beginners-disabilities",
+     "preventing-client-injuries",
+     "fitness-emergency-response",
+     "scope-of-practice-fitness",
+     "hands-on-cues-consent",
+     "inclusive-coaching-every-body",
+     "professional-boundaries-fitness"
+    ],
+    "front-desk": [
+     "gym-tours-trials-first-visit",
+     "membership-sales-no-pressure",
+     "gym-cancellations-freezes",
+     "billing-disputes-refunds",
+     "member-retention-first-90-days",
+     "customer-service-basics",
+     "customer-goes-off",
+     "card-payment-safety"
+    ],
+    "facility": [
+     "gym-equipment-floor-safety",
+     "equipment-checks-repair-reports",
+     "pool-hot-tub-sauna-safety",
+     "locker-room-privacy",
+     "kids-club-child-watch",
+     "opening-closing-alone",
+     "gym-cleaning-sanitation"
+    ],
+    "leads": [
+     "leading-friends",
+     "running-a-great-shift",
+     "setting-expectations",
+     "training-on-the-job",
+     "giving-feedback",
+     "recognizing-good-work",
+     "delegating-tasks",
+     "accountability-talks",
+     "safety-huddle",
+     "injury-report"
+    ]
+   }
+  },
+  {
+   "slug": "restaurant",
+   "title": "Restaurant and Food Service",
+   "title_es": "Restaurantes y servicio de comida",
+   "industry": "restaurant",
+   "description": "Food safety, kitchen safety, alcohol service and pay basics for crews, plus shift leads.",
+   "paths": {
+    "crew": [
+     "food-safety-allergens",
+     "food-handler-hygiene",
+     "food-allergy-orders",
+     "kitchen-knife-burn-safety",
+     "slips-trips-falls",
+     "cleaning-chemical-safety",
+     "fire-safety",
+     "alcohol-id-checks",
+     "customer-goes-off",
+     "wage-hour-basics"
+    ],
+    "illinois": [
+     "harassment-prevention-il-restaurants"
+    ],
+    "leads": [
+     "leading-friends",
+     "running-a-great-shift",
+     "setting-expectations",
+     "training-on-the-job",
+     "giving-feedback",
+     "recognizing-good-work",
+     "delegating-tasks",
+     "accountability-talks",
+     "safety-huddle",
+     "injury-report"
+    ]
+   }
+  },
+  {
+   "slug": "retail",
+   "title": "Retail",
+   "title_es": "Tiendas y comercio",
+   "industry": "retail",
+   "description": "Customer service, theft and payment safety, and store safety, plus shift leads.",
+   "paths": {
+    "core": [
+     "customer-service-basics",
+     "customer-goes-off",
+     "security-theft-awareness",
+     "card-payment-safety",
+     "alcohol-id-checks",
+     "safe-lifting-ergonomics",
+     "slips-trips-falls",
+     "emergency-action-plans"
+    ],
+    "leads": [
+     "leading-friends",
+     "running-a-great-shift",
+     "setting-expectations",
+     "training-on-the-job",
+     "giving-feedback",
+     "recognizing-good-work",
+     "delegating-tasks",
+     "accountability-talks",
+     "safety-huddle",
+     "injury-report"
+    ]
+   }
+  }
+ ],
+ "demo": {
+  "join_code": "DEMO",
+  "assign": "all"
+ }
+}
