@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+:root {
+  --background: #fff7fa;
+  --foreground: #2b1d2a;
+  --brand: #f48fb1;
+  --brand-dark: #d66a92;
+  --card: #ffffff;
+  --muted: #7a6677;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-brand: var(--brand);
+  --color-brand-dark: var(--brand-dark);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: ui-rounded, "SF Pro Rounded", "Nunito", system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
+}
