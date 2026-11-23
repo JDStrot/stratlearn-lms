@@ -8,7 +8,8 @@ import { cookies } from "next/headers";
  */
 
 export const SESSION_COOKIE = "sl_learner";
-const MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // 30 days: shared phones stay signed in
+const MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // 30 days: "Keep me signed in" on your own phone
+const SHARED_DEVICE_SECONDS = 60 * 60 * 12; // shared tablets: ends when the browser closes, or after 12 hours
 
 export type LearnerSession = { lid: string; oid: string; exp: number };
 
@@ -24,11 +25,11 @@ function sign(payload: string): string {
   return createHmac("sha256", secret()).update(payload).digest("base64url");
 }
 
-export function encodeSession(lid: string, oid: string): string {
+export function encodeSession(lid: string, oid: string, remember = true): string {
   const body: LearnerSession = {
     lid,
     oid,
-    exp: Math.floor(Date.now() / 1000) + MAX_AGE_SECONDS,
+    exp: Math.floor(Date.now() / 1000) + (remember ? MAX_AGE_SECONDS : SHARED_DEVICE_SECONDS),
   };
   const payload = Buffer.from(JSON.stringify(body)).toString("base64url");
   return `${payload}.${sign(payload)}`;
@@ -58,9 +59,16 @@ export const sessionCookieOptions = {
   maxAge: MAX_AGE_SECONDS,
 };
 
-export async function startSession(lid: string, oid: string) {
+export async function startSession(lid: string, oid: string, remember = true) {
   const store = await cookies();
-  store.set(SESSION_COOKIE, encodeSession(lid, oid), sessionCookieOptions);
+  if (remember) {
+    store.set(SESSION_COOKIE, encodeSession(lid, oid), sessionCookieOptions);
+  } else {
+    // No maxAge: the browser drops the cookie when it closes (shared-tablet mode).
+    const { maxAge: _drop, ...sessionOnly } = sessionCookieOptions;
+    void _drop;
+    store.set(SESSION_COOKIE, encodeSession(lid, oid, false), sessionOnly);
+  }
 }
 
 export async function endSession() {

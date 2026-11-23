@@ -10,6 +10,7 @@ export async function loginWithPin(_prev: LoginState, form: FormData): Promise<L
   const joinCode = String(form.get("joinCode") ?? "").trim();
   const username = String(form.get("username") ?? "").trim();
   const pin = String(form.get("pin") ?? "").trim();
+  const remember = form.get("remember") === "on";
 
   if (!joinCode || !username || !/^[0-9]{4,8}$/.test(pin)) {
     return { error: "Enter your team code, your name and your PIN." };
@@ -31,7 +32,7 @@ export async function loginWithPin(_prev: LoginState, form: FormData): Promise<L
     };
   }
 
-  await startSession(match.learner_id, match.org_id);
+  await startSession(match.learner_id, match.org_id, remember);
   redirect("/learn");
 }
 

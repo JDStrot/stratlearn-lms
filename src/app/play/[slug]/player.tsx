@@ -41,8 +41,8 @@ export function CoursePlayer({ slug, lang }: { slug: string; lang: "en" | "es" }
         allow="fullscreen; autoplay"
       />
       {saved && (
-        <p className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-foreground px-4 py-2 text-sm text-white shadow">
-          {lang === "es" ? "¡Curso completado y guardado!" : "Course complete and saved!"}
+        <p role="status" className="chip absolute bottom-4 left-1/2 -translate-x-1/2 shadow-soft">
+          {lang === "es" ? "✦ ¡Curso completado y guardado!" : "✦ Course complete and saved!"}
         </p>
       )}
     </div>

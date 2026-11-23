@@ -1,26 +1,292 @@
 @import "tailwindcss";
 
+/* STRATLEARN brand tokens (match stratlearn.co). No other brand colors. */
 :root {
-  --background: #fff7fa;
-  --foreground: #2b1d2a;
-  --brand: #f48fb1;
-  --brand-dark: #d66a92;
-  --card: #ffffff;
-  --muted: #7a6677;
+  --plum: #400265;
+  --plum-deep: #2a0143;
+  --violet: #6b39b1;
+  --lilac: #c5a8f5;
+  --mist: #e9e0ff;
+  --paper: #fdfcff;
+  --ink: #1f1330;
+  --muted: #5d5170;
+  --line: #e4dcf3;
+  --success: #1d7a46;
+  --error: #b3261e;
+  --shadow: 0 30px 60px -30px rgba(64, 2, 101, 0.45);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-brand: var(--brand);
-  --color-brand-dark: var(--brand-dark);
-  --color-card: var(--card);
+  --color-plum: var(--plum);
+  --color-plum-deep: var(--plum-deep);
+  --color-violet: var(--violet);
+  --color-lilac: var(--lilac);
+  --color-mist: var(--mist);
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
   --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-success: var(--success);
+  --color-error: var(--error);
+  --font-serif: var(--font-instrument-serif), Georgia, serif;
+  --font-label: var(--font-league-spartan), system-ui, sans-serif;
+  --font-sans: var(--font-dm-sans), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --shadow-soft: var(--shadow);
+}
+
+@layer base {
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: ui-rounded, "SF Pro Rounded", "Nunito", system-ui, -apple-system,
-    "Segoe UI", Roboto, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 1.05rem;
+  line-height: 1.55;
+  overflow-x: hidden;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  color: var(--plum);
+  line-height: 1.08;
+}
+h1 em,
+h2 em,
+h3 em {
+  color: var(--violet);
+  font-style: italic;
+}
+
+a {
+  color: var(--violet);
+}
+
+:focus-visible {
+  outline: 3px solid var(--lilac);
+  outline-offset: 2px;
+}
+
+}
+
+@layer components {
+/* Labels, eyebrows, chips */
+.eyebrow {
+  font-family: var(--font-label);
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--violet);
+}
+.label {
+  font-family: var(--font-label);
+  font-weight: 600;
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  border: 1px solid var(--lilac);
+  background: #fff;
+  color: var(--plum);
+  padding: 0.3rem 0.75rem;
+  font-family: var(--font-label);
+  font-weight: 600;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+/* Buttons: pill, uppercase League Spartan */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 48px;
+  border-radius: 999px;
+  padding: 0.9rem 1.6rem;
+  font-family: var(--font-label);
+  font-weight: 600;
+  font-size: 0.85rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-decoration: none;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: background-color 0.18s, color 0.18s, transform 0.18s, border-color 0.18s;
+}
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: var(--plum);
+  color: #fff;
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--violet);
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--plum);
+  border-color: var(--plum);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--plum);
+  color: #fff;
+}
+.btn-light {
+  background: var(--lilac);
+  color: var(--plum);
+}
+.btn-light:hover:not(:disabled) {
+  background: #fff;
+}
+.btn-sm {
+  min-height: 44px;
+  padding: 0.6rem 1.15rem;
+  font-size: 0.75rem;
+}
+
+/* Cards */
+.card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+.card-hover:hover {
+  transform: translateY(-3px);
+  border-color: var(--lilac);
+  box-shadow: var(--shadow);
+}
+
+/* Form fields */
+.field {
+  width: 100%;
+  min-height: 52px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 0.75rem 1rem;
+  font-size: 1.1rem;
+}
+.field:focus {
+  outline: 3px solid var(--lilac);
+  outline-offset: 0;
+  border-color: var(--violet);
+}
+
+/* Sparkle lists */
+.sparkle-list {
+  list-style: none;
+  padding: 0;
+}
+.sparkle-list li {
+  position: relative;
+  padding-left: 1.5rem;
+}
+.sparkle-list li::before {
+  content: "✦";
+  position: absolute;
+  left: 0;
+  color: var(--violet);
+}
+.on-dark .sparkle-list li::before {
+  color: var(--lilac);
+}
+
+/* Dark bands */
+.on-dark {
+  background: linear-gradient(135deg, var(--plum) 0%, var(--plum-deep) 100%);
+  color: #efe7ff;
+}
+.on-dark h1,
+.on-dark h2,
+.on-dark h3 {
+  color: #fff;
+}
+.on-dark h1 em,
+.on-dark h2 em {
+  color: var(--lilac);
+}
+.on-dark a {
+  color: var(--lilac);
+}
+.on-dark .eyebrow {
+  color: var(--lilac);
+}
+/* White cards sitting on a dark band go back to the light style */
+.on-dark .card {
+  color: var(--ink);
+}
+.on-dark .card h1,
+.on-dark .card h2,
+.on-dark .card h3 {
+  color: var(--plum);
+}
+.on-dark .card em,
+.on-dark .card a,
+.on-dark .card .eyebrow {
+  color: var(--violet);
+}
+
+/* Progress */
+.progress {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--mist);
+  overflow: hidden;
+}
+.progress > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--plum), var(--violet));
+}
+.on-dark .progress {
+  background: rgba(233, 224, 255, 0.2);
+}
+.on-dark .progress > span {
+  background: var(--lilac);
+}
+
+.wrap {
+  width: 100%;
+  max-width: 1160px;
+  margin-inline: auto;
+  padding-inline: 24px;
+}
+
+@media (max-width: 640px) {
+  .wrap {
+    padding-inline: 16px;
+  }
+}
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
 }
