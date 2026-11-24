@@ -133,7 +133,7 @@ async function syncCourse(db, slug, bySlug) {
   const titles = head.match(/T=\{en:("(?:[^"\\]|\\.)*"),es:("(?:[^"\\]|\\.)*")\}/);
   const title = titles ? JSON.parse(titles[1]) : head.match(/<title>([^<]*)<\/title>/i)?.[1]?.trim() || slug;
   const title_es = titles ? JSON.parse(titles[2]) : null;
-  const minutes = Number(head.match(/minutes:(\d+)/)?.[1]) || null;
+  const minutes = courseMinutes(head, slug);
 
   const version = bySlug.get(slug)?.version ?? 1;
   const storage_path = `lottie/${slug}/v${version}/bilingual.html`;
@@ -174,3 +174,14 @@ async function syncCourse(db, slug, bySlug) {
 }
 
 main().catch((e) => console.error(`[courses] stopped: ${e.message}`));
+
+// A course file built from a shared source (harassment, workplace violence,
+// mandated reporter...) carries a table of every version, each with its own
+// minutes. Read the entry whose id is this course's slug; only fall back to
+// the first "minutes:" in the file for single-version courses.
+function courseMinutes(html, slug) {
+  const esc = slug.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const own = html.match(new RegExp(`id:'${esc}'[^}]*?minutes:(\\d+)`));
+  const n = Number((own ?? html.match(/minutes:(\d+)/))?.[1]);
+  return n > 0 ? n : null;
+}
