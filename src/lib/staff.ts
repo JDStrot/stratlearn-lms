@@ -123,18 +123,41 @@ export function randomToken(bytes = 24): string {
   ).join("");
 }
 
-/** "Maria Lopez" -> "maria.l" (made unique by the caller). */
-export function suggestUsername(name: string): string {
+/**
+ * House style for auto-made sign-in names (Jesse's pick, 2026-11-24).
+ *   first.last  maria.lopez
+ *   first.l     maria.l, then maria.lo, maria.lop ... if taken
+ *   flast       mlopez
+ */
+export const USERNAME_STYLE: "first.last" | "first.l" | "flast" = "first.last";
+
+/**
+ * Sign-in names to try, best first. The caller adds a number only after
+ * every candidate is taken (two people with the exact same name).
+ */
+export function usernameCandidates(name: string, style = USERNAME_STYLE): string[] {
   const parts = name
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
-    .replace(/[^a-z0-9 ]/g, "")
+    .replace(/[^a-z0-9 -]/g, "")
+    .replace(/-/g, "")
     .trim()
     .split(/\s+/)
     .filter(Boolean);
-  if (!parts.length) return "worker";
-  return parts.length === 1 ? parts[0] : `${parts[0]}.${parts[parts.length - 1][0]}`;
+  if (!parts.length) return ["worker"];
+  const first = parts[0];
+  if (parts.length === 1) return [first];
+  const last = parts[parts.length - 1];
+  if (style === "flast") return [`${first[0]}${last}`, `${first}${last}`];
+  if (style === "first.last") return [`${first}.${last}`];
+  const out: string[] = [];
+  for (let i = 1; i <= last.length; i++) out.push(`${first}.${last.slice(0, i)}`);
+  return out;
+}
+
+export function suggestUsername(name: string): string {
+  return usernameCandidates(name)[0];
 }
 
 /** Mobile numbers are stored as digits with country code (US default): 15551234567. */

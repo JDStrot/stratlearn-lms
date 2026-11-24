@@ -15,7 +15,7 @@ import {
   randomPin,
   randomToken,
   requireStaff,
-  suggestUsername,
+  usernameCandidates,
   type LoginSettings,
   type Staff,
 } from "@/lib/staff";
@@ -82,15 +82,24 @@ async function findOrMake(table: "job_roles" | "locations", orgId: string, name:
   return data.id as string;
 }
 
-/** Picks a username nobody on the team has yet: maria.l, maria.l2, ... */
-async function uniqueUsername(orgId: string, wanted: string, taken: Set<string>) {
-  const base = wanted.toLowerCase().replace(/[^a-z0-9._-]/g, "") || "worker";
+/**
+ * Picks a sign-in name nobody on the team has yet, trying the house-style
+ * candidates in order (see usernameCandidates). Only when all are taken, or
+ * for a name the manager typed, does a number go on the end.
+ */
+async function uniqueUsername(orgId: string, candidates: string[], taken: Set<string>) {
   if (!taken.size) {
     const { data } = await supabaseAdmin().from("learners").select("username").eq("org_id", orgId);
     for (const r of data ?? []) taken.add(r.username.toLowerCase());
+    taken.add("\u0000"); // mark as loaded even for an empty team
   }
-  let name = base;
-  for (let i = 2; taken.has(name); i++) name = `${base}${i}`;
+  const clean = candidates.map((c) => c.toLowerCase().replace(/[^a-z0-9._-]/g, "")).filter(Boolean);
+  if (!clean.length) clean.push("worker");
+  let name = clean.find((c) => !taken.has(c));
+  if (!name) {
+    const base = clean[clean.length - 1];
+    for (let i = 2; !name; i++) if (!taken.has(`${base}${i}`)) name = `${base}${i}`;
+  }
   taken.add(name);
   return name;
 }
@@ -149,7 +158,7 @@ export async function addPeople(_p: AddState, f: FormData): Promise<AddState> {
   const created: NewPerson[] = [];
   try {
     for (const r of rows) {
-      const username = await uniqueUsername(s.org.id, r.username || suggestUsername(r.name), taken);
+      const username = await uniqueUsername(s.org.id, r.username ? [r.username] : usernameCandidates(r.name), taken);
       const [job_role_id, location_id] = await Promise.all([
         findOrMake("job_roles", s.org.id, r.role ?? null),
         findOrMake("locations", s.org.id, r.location ?? null),

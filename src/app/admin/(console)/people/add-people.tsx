@@ -58,7 +58,7 @@ export function AddPeople({
         {mode === "one" ? (
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Full name"><input name="name" className="field" required autoComplete="off" /></Field>
-            <Field label="Sign-in name" hint="Leave blank and we'll make one, like maria.l">
+            <Field label="Sign-in name" hint="Leave blank and we'll make one, like maria.lopez">
               <input name="username" className="field" autoCapitalize="none" autoComplete="off" />
             </Field>
             <Field label="Role" hint="Pick one or type a new one"><input name="role" list="role-list" className="field" /></Field>
