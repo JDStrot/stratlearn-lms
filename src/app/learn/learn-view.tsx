@@ -1,7 +1,12 @@
 import Link from "next/link";
 import type { Course } from "@/lib/learner";
+import { CourseArt } from "./course-art";
 
-export type LearnItem = { course: Course; dueAt: string | null; completedAt: string | null };
+export type LearnItem = {
+  course: Course;
+  dueAt: string | null;
+  completedAt: string | null;
+};
 
 /** Learner home: greeting band with progress, then courses to do and finished. */
 export function LearnView({
@@ -19,7 +24,11 @@ export function LearnView({
   const done = items.filter((i) => i.completedAt);
   const pct = items.length ? Math.round((done.length / items.length) * 100) : 0;
   const title = (c: Course) => (es && c.title_es) || c.title;
-  const date = (d: string) => new Date(d).toLocaleDateString(es ? "es" : "en", { month: "short", day: "numeric" });
+  const date = (d: string) =>
+    new Date(d).toLocaleDateString(es ? "es" : "en", {
+      month: "short",
+      day: "numeric",
+    });
 
   return (
     <main id="main" className="flex-1">
@@ -49,7 +58,13 @@ export function LearnView({
                   {done.length} / {items.length}
                 </span>
               </div>
-              <div className="progress" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+              <div
+                className="progress"
+                role="progressbar"
+                aria-valuenow={pct}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
                 <span style={{ width: `${pct}%` }} />
               </div>
             </div>
@@ -75,7 +90,9 @@ export function LearnView({
           </div>
           {todo.length === 0 ? (
             <p className="card bg-mist p-6 text-muted">
-              {es ? "No tienes cursos pendientes ahora." : "Nothing to do right now. New courses will show up here."}
+              {es
+                ? "No tienes cursos pendientes ahora."
+                : "Nothing to do right now. New courses will show up here."}
             </p>
           ) : (
             <ul className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -83,18 +100,28 @@ export function LearnView({
                 <li key={course.id}>
                   <Link
                     href={`/play/${course.slug}`}
-                    className="card card-hover flex h-full flex-col gap-4 p-6 text-ink no-underline"
+                    className="card card-hover flex h-full flex-col overflow-hidden text-ink no-underline"
                   >
-                    <div className="flex flex-wrap gap-2">
-                      {course.minutes ? <span className="chip">{course.minutes} min</span> : null}
-                      {dueAt ? (
-                        <span className="chip">
-                          {es ? "Vence" : "Due"} {date(dueAt)}
-                        </span>
-                      ) : null}
+                    <CourseArt
+                      slug={course.slug}
+                      className="aspect-[16/10] border-b border-line"
+                    />
+                    <div className="flex flex-1 flex-col gap-4 p-6">
+                      <div className="flex flex-wrap gap-2">
+                        {course.minutes ? (
+                          <span className="chip">{course.minutes} min</span>
+                        ) : null}
+                        {dueAt ? (
+                          <span className="chip">
+                            {es ? "Vence" : "Due"} {date(dueAt)}
+                          </span>
+                        ) : null}
+                      </div>
+                      <h3 className="text-[1.7rem]">{title(course)}</h3>
+                      <span className="btn btn-primary btn-sm mt-auto self-start">
+                        {es ? "Empezar" : "Start"}
+                      </span>
                     </div>
-                    <h3 className="text-[1.7rem]">{title(course)}</h3>
-                    <span className="btn btn-primary btn-sm mt-auto self-start">{es ? "Empezar" : "Start"}</span>
                   </Link>
                 </li>
               ))}
@@ -124,20 +151,39 @@ export function LearnView({
               {done.map(({ course, completedAt }) => {
                 const code = certByCourse[course.id];
                 return (
-                  <li key={course.id} className="card card-hover flex items-center gap-4 p-5">
-                    <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-full bg-plum text-xl text-lilac">
-                      ✦
+                  <li
+                    key={course.id}
+                    className="card card-hover flex items-center gap-4 p-3 pr-5"
+                  >
+                    <span className="relative shrink-0">
+                      <CourseArt
+                        slug={course.slug}
+                        className="h-[60px] w-24 rounded-[10px]"
+                      />
+                      <span
+                        aria-hidden
+                        className="absolute -right-2 -top-2 grid size-7 place-items-center rounded-full bg-plum text-sm text-lilac ring-2 ring-white"
+                      >
+                        ✦
+                      </span>
                     </span>
-                    <Link href={`/play/${course.slug}`} className="flex-1 text-ink no-underline hover:text-violet">
+                    <Link
+                      href={`/play/${course.slug}`}
+                      className="flex-1 text-ink no-underline hover:text-violet"
+                    >
                       <span className="block font-medium">{title(course)}</span>
                       {completedAt && (
                         <span className="text-sm text-muted">
-                          {es ? "Terminado" : "Finished"} {date(completedAt)} · {es ? "Repasar" : "Review"}
+                          {es ? "Terminado" : "Finished"} {date(completedAt)} ·{" "}
+                          {es ? "Repasar" : "Review"}
                         </span>
                       )}
                     </Link>
                     {code && (
-                      <Link href={`/verify/${code}`} className="chip no-underline hover:border-violet">
+                      <Link
+                        href={`/verify/${code}`}
+                        className="chip no-underline hover:border-violet"
+                      >
                         {es ? "Certificado" : "Certificate"}
                       </Link>
                     )}
