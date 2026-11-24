@@ -19,6 +19,7 @@ const ERRORS: Record<string, string> = {
   link: "That sign-in link expired or was already used. Send a new one.",
   nomatch: "We couldn't find you on a team. Ask your manager to add your email, or use your PIN.",
   off: "Your team doesn't use that way to sign in. Try your PIN or QR badge.",
+  paused: "Your team's training account is paused. Please talk to your manager.",
   provider: "That sign-in option isn't ready yet. Use your PIN or email.",
 };
 

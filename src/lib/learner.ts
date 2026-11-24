@@ -29,12 +29,17 @@ export async function requireLearner(): Promise<Learner> {
   if (!session) redirect("/");
   const { data } = await supabaseAdmin()
     .from("learners")
-    .select("id, org_id, display_name, preferred_language, job_role_id, location_id")
+    .select("id, org_id, display_name, preferred_language, job_role_id, location_id, organizations(status)")
     .eq("id", session.lid)
     .eq("is_active", true)
     .maybeSingle();
   if (!data) redirect("/");
-  return data as Learner;
+  // Paused or closed client accounts can't train (records are kept).
+  const status = (data.organizations as unknown as { status?: string } | null)?.status;
+  if (status && status !== "active") redirect("/?e=paused");
+  const { organizations: _org, ...learner } = data;
+  void _org;
+  return learner as Learner;
 }
 
 /**

@@ -12,13 +12,14 @@ const LINKS = [
   ["/admin/settings", "Team settings"],
 ] as const;
 
-export function AdminNav() {
+export function AdminNav({ owner = false }: { owner?: boolean }) {
   const path = usePathname();
+  const links: (readonly [string, string])[] = owner ? [...LINKS, ["/admin/owner", "★ Owner portal"] as const] : [...LINKS];
   return (
     <nav aria-label="Console" className="wrap overflow-x-auto">
       <ul className="label flex gap-1 whitespace-nowrap pb-2">
-        {LINKS.map(([href, text]) => {
-          const on = href === "/admin" ? path === href : path.startsWith(href);
+        {links.map(([href, text]) => {
+          const on = href === "/admin" ? path === href : path.startsWith(href) && !(href === "/admin/owner" ? false : path.startsWith("/admin/owner"));
           return (
             <li key={href}>
               <Link

@@ -60,6 +60,8 @@ async function main() {
 
   // 3. Packs and their path tabs.
   const packIds = [];
+  const { data: knownPacks } = await db.from("packs").select("slug");
+  const packExists = new Set((knownPacks ?? []).map((p) => p.slug));
   for (const p of catalog.packs) {
     const { data: pack, error } = await db
       .from("packs")
@@ -70,7 +72,7 @@ async function main() {
           title_es: p.title_es,
           description: p.description,
           industry: p.industry,
-          is_published: true,
+          ...(packExists.has(p.slug) ? {} : { is_published: true }),
         },
         { onConflict: "slug" },
       )
@@ -152,7 +154,8 @@ async function syncCourse(db, slug, bySlug) {
         minutes,
         series: "lottie",
         storage_path,
-        is_published: true,
+        // New courses go live; existing ones keep the owner portal's Live/Hidden switch.
+        ...(bySlug.has(slug) ? {} : { is_published: true }),
         updated_at: new Date().toISOString(),
       },
       { onConflict: "slug" },

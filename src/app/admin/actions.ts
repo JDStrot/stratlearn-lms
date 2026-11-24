@@ -136,6 +136,14 @@ export async function addPeople(_p: AddState, f: FormData): Promise<AddState> {
   }
   if (!rows.length) return { error: "Add at least one name." };
   if (rows.length > 500) return { error: "Add up to 500 people at a time." };
+  const { data: orgRow } = await db.from("organizations").select("seat_limit").eq("id", s.org.id).single();
+  if (orgRow?.seat_limit) {
+    const { count } = await db.from("learners").select("id", { count: "exact", head: true }).eq("org_id", s.org.id).eq("is_active", true);
+    const left = orgRow.seat_limit - (count ?? 0);
+    if (rows.length > left) {
+      return { error: `Your plan has ${orgRow.seat_limit} seats and ${Math.max(left, 0)} are free. Turn off people who left, or contact STRATLEARN for more seats.` };
+    }
+  }
 
   const taken = new Set<string>();
   const created: NewPerson[] = [];

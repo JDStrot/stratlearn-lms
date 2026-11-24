@@ -37,7 +37,7 @@ export default async function ConsoleLayout({ children }: { children: React.Reac
             </form>
           </div>
         </div>
-        <AdminNav />
+        <AdminNav owner={s.isPlatformAdmin} />
       </header>
       <main id="main" className="wrap flex-1 py-8 lg:py-10">{children}</main>
     </div>
