@@ -113,7 +113,7 @@ export function LearnView({
                     <div className="flex flex-1 flex-col gap-4 p-6">
                       <div className="flex flex-wrap gap-2">
                         {course.minutes ? (
-                          <span className="chip">{course.minutes} min</span>
+                          <span className="chip">{length(course.minutes, es)}</span>
                         ) : null}
                         {dueAt ? (
                           <span className="chip">
@@ -200,6 +200,17 @@ export function LearnView({
       )}
     </main>
   );
+}
+
+// Course length for the card chip: "7 min", "1 hr", "2 hr", "1 hr 30 min".
+// Courses that must meet a state minimum (California 1 or 2 hours,
+// Connecticut 2 hours) show hours so the label matches the law.
+function length(minutes: number, es: boolean) {
+  if (minutes < 60) return `${minutes} min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  const hr = es ? (h === 1 ? "hora" : "horas") : "hr";
+  return m ? `${h} ${hr} ${m} min` : `${h} ${hr}`;
 }
 
 function PreviewBox({ className, children }: { href: string; className?: string; children: React.ReactNode }) {

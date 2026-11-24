@@ -20,7 +20,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ e
             </h1>
             <p className="max-w-md text-lg">Short, friendly courses you can finish on a break. Pick the easiest way in.</p>
             <ul className="sparkle-list hidden flex-col gap-2 text-[1.05rem] lg:flex">
-              <li>5 to 8 minutes a course</li>
+              <li>Most courses take 5 to 8 minutes</li>
               <li>English or Spanish, any time</li>
               <li>Earn badges and a real certificate</li>
             </ul>
