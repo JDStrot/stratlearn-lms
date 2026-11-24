@@ -7,8 +7,8 @@ import { useEffect, useRef, useState } from "react";
  *
  * A course tells the platform it is finished with:
  *   window.parent.postMessage({ type: "stratlearn:complete", score: 92, lang: "en" }, "*")
- * (score and lang are optional). The Lottie course player still needs this
- * one-line hook added; see README "Course completion hook".
+ * (score and lang are optional). Lottie courses send it through the script
+ * the content route adds to each course (src/lib/course-hook.ts).
  */
 export function CoursePlayer({ slug, lang }: { slug: string; lang: "en" | "es" }) {
   const frame = useRef<HTMLIFrameElement>(null);

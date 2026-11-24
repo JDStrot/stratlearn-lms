@@ -4,11 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/sync-courses.mjs && next build",
+    "sync-courses": "SYNC_COURSES=1 node --env-file=.env.local scripts/sync-courses.mjs",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
-    "upload-courses": "node --env-file=.env.local scripts/upload-courses.mjs"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

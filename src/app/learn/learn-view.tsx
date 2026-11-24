@@ -4,7 +4,17 @@ import type { Course } from "@/lib/learner";
 export type LearnItem = { course: Course; dueAt: string | null; completedAt: string | null };
 
 /** Learner home: greeting band with progress, then courses to do and finished. */
-export function LearnView({ name, es, items }: { name: string; es: boolean; items: LearnItem[] }) {
+export function LearnView({
+  name,
+  es,
+  items,
+  certByCourse = {},
+}: {
+  name: string;
+  es: boolean;
+  items: LearnItem[];
+  certByCourse?: Record<string, string>;
+}) {
   const todo = items.filter((i) => !i.completedAt);
   const done = items.filter((i) => i.completedAt);
   const pct = items.length ? Math.round((done.length / items.length) * 100) : 0;
@@ -111,27 +121,29 @@ export function LearnView({ name, es, items }: { name: string; es: boolean; item
               </h2>
             </div>
             <ul className="grid gap-3 md:grid-cols-2">
-              {done.map(({ course, completedAt }) => (
-                <li key={course.id}>
-                  <Link
-                    href={`/play/${course.slug}`}
-                    className="card card-hover flex items-center gap-4 p-5 text-ink no-underline"
-                  >
+              {done.map(({ course, completedAt }) => {
+                const code = certByCourse[course.id];
+                return (
+                  <li key={course.id} className="card card-hover flex items-center gap-4 p-5">
                     <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-full bg-plum text-xl text-lilac">
                       ✦
                     </span>
-                    <span className="flex-1">
+                    <Link href={`/play/${course.slug}`} className="flex-1 text-ink no-underline hover:text-violet">
                       <span className="block font-medium">{title(course)}</span>
                       {completedAt && (
                         <span className="text-sm text-muted">
-                          {es ? "Terminado" : "Finished"} {date(completedAt)}
+                          {es ? "Terminado" : "Finished"} {date(completedAt)} · {es ? "Repasar" : "Review"}
                         </span>
                       )}
-                    </span>
-                    <span className="label text-violet">{es ? "Repasar" : "Review"}</span>
-                  </Link>
-                </li>
-              ))}
+                    </Link>
+                    {code && (
+                      <Link href={`/verify/${code}`} className="chip no-underline hover:border-violet">
+                        {es ? "Certificado" : "Certificate"}
+                      </Link>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </div>
         </section>
