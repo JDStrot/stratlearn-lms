@@ -136,3 +136,11 @@ export function suggestUsername(name: string): string {
   if (!parts.length) return "worker";
   return parts.length === 1 ? parts[0] : `${parts[0]}.${parts[parts.length - 1][0]}`;
 }
+
+/** Mobile numbers are stored as digits with country code (US default): 15551234567. */
+export function normalizePhone(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const d = raw.replace(/\D/g, "");
+  if (d.length === 10) return `1${d}`;
+  return d.length >= 11 && d.length <= 15 ? d : null;
+}

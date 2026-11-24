@@ -6,7 +6,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { newBadge, removeAssignment, setActive, unlockPerson } from "../../../actions";
 import { fmtDate, loadTeam, nameOf } from "../../../data";
 import { PageHead, StatusChip } from "../../../ui";
-import { EditPerson, ResetPin } from "./forms";
+import { EditPerson, EmailSignIn, ResetPin } from "./forms";
 
 export default async function PersonPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -115,6 +115,9 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
               <span className="text-sm text-muted">Lost badge? Make a new QR code. The old one stops working.</span>
               <button className="btn btn-ghost btn-sm">New QR badge</button>
             </form>
+            <div className="mt-4 border-t border-line pt-4">
+              <EmailSignIn id={p.id} email={p.email} />
+            </div>
           </section>
 
           <section className="card p-6">

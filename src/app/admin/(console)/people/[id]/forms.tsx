@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { resetPin, updatePerson, type FormState, type PinState } from "../../../actions";
+import { emailLearnerLink, resetPin, setLearnerPassword, updatePerson, type FormState, type PinState, type StaffState } from "../../../actions";
 import type { Person } from "../../../data";
 import { Field, Notice } from "../../../ui";
 
@@ -68,5 +68,37 @@ export function EditPerson({
       <Notice state={state} />
       <button disabled={pending} className="btn btn-primary btn-sm self-start">{pending ? "Saving..." : "Save"}</button>
     </form>
+  );
+}
+
+export function EmailSignIn({ id, email }: { id: string; email: string | null }) {
+  const [pw, pwAction, pwPending] = useActionState<StaffState, FormData>(setLearnerPassword, {});
+  const [link, linkAction, linkPending] = useActionState<FormState, FormData>(emailLearnerLink, {});
+  if (!email) return <p className="text-sm text-muted">Add an email under Details to let them sign in with email too.</p>;
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-sm text-muted">Email sign-in: <b className="text-plum">{email}</b></p>
+      <form action={linkAction} className="flex flex-wrap items-center gap-3">
+        <input type="hidden" name="id" value={id} />
+        <button disabled={linkPending} className="btn btn-ghost btn-sm">Email them a sign-in link</button>
+      </form>
+      <Notice state={link} />
+      <form action={pwAction} className="flex flex-wrap items-end gap-3">
+        <input type="hidden" name="id" value={id} />
+        <label className="flex flex-1 flex-col gap-1.5">
+          <span className="label text-plum">New password</span>
+          <input name="password" type="text" minLength={8} placeholder="Blank = random" autoComplete="off" className="field" />
+        </label>
+        <button disabled={pwPending} className="btn btn-primary btn-sm">Reset password</button>
+      </form>
+      {pw.password ? (
+        <p role="status" className="rounded-[10px] border border-success/30 bg-success/5 px-4 py-3">
+          New password: <b className="font-mono text-plum">{pw.password}</b>
+          <span className="block text-sm text-muted">Give it to them privately. They can change it under My sign-in.</span>
+        </p>
+      ) : (
+        <Notice state={pw} />
+      )}
+    </div>
   );
 }

@@ -11,6 +11,7 @@ import {
   ORG_COOKIE,
   canManageTeam,
   logEvent,
+  normalizePhone,
   randomPin,
   randomToken,
   requireStaff,
@@ -128,7 +129,7 @@ export async function addPeople(_p: AddState, f: FormData): Promise<AddState> {
       role: opt(f, "role"),
       location: opt(f, "location"),
       email,
-      phone: opt(f, "phone"),
+      phone: normalizePhone(opt(f, "phone")),
       employeeId: opt(f, "employeeId"),
       pin: pin || undefined,
     });
@@ -206,7 +207,7 @@ export async function updatePerson(_p: FormState, f: FormData): Promise<FormStat
       display_name: name,
       username,
       email,
-      phone: opt(f, "phone"),
+      phone: normalizePhone(opt(f, "phone")),
       employee_id: opt(f, "employeeId"),
       preferred_language: str(f, "language") === "es" ? "es" : "en",
       job_role_id,
@@ -482,4 +483,60 @@ export async function unlockPerson(f: FormData) {
     .eq("org_id", s.org.id);
   await logEvent(s, "person.unlock", { learner_id: id, username: person.username });
   revalidatePath(`/admin/people/${id}`);
+}
+
+// ---------------------------------------------------------------------------
+// Learner sign-in help (email accounts) and shared tablets
+// ---------------------------------------------------------------------------
+
+/** Sets a new password on a worker's email sign-in (making the account if needed). */
+export async function setLearnerPassword(_p: StaffState, f: FormData): Promise<StaffState> {
+  const s = await requireStaff();
+  const id = str(f, "id");
+  await ownPerson(s, id);
+  const db = supabaseAdmin();
+  const { data: p } = await db.from("learners").select("email, auth_user_id").eq("id", id).single();
+  if (!p?.email) return { error: "Add their email first (Details, below)." };
+  const password = str(f, "password") || `${randomToken(3)}-${randomToken(3)}`;
+  if (password.length < 8) return { error: "Use at least 8 characters." };
+  let authId = p.auth_user_id as string | null;
+  if (authId) {
+    const { error } = await db.auth.admin.updateUserById(authId, { password, email: p.email, email_confirm: true });
+    if (error) return { error: error.message };
+  } else {
+    const { data, error } = await db.auth.admin.createUser({ email: p.email, password, email_confirm: true });
+    if (error || !data.user) return { error: "That email already has an account somewhere. Ask them to use “Email me a link” once to connect it." };
+    authId = data.user.id;
+    await db.from("learners").update({ auth_user_id: authId }).eq("id", id);
+  }
+  await logEvent(s, "person.password_reset", { learner_id: id });
+  return { ok: "Password set.", password };
+}
+
+/** Emails the worker a one-tap sign-in link (also works as "forgot password"). */
+export async function emailLearnerLink(_p: FormState, f: FormData): Promise<FormState> {
+  const s = await requireStaff();
+  const id = str(f, "id");
+  await ownPerson(s, id);
+  const { data: p } = await supabaseAdmin().from("learners").select("email").eq("id", id).single();
+  if (!p?.email) return { error: "Add their email first (Details, below)." };
+  const { supabaseAnonNoSession } = await import("@/lib/learner-auth");
+  const { error } = await supabaseAnonNoSession().auth.signInWithOtp({
+    email: p.email,
+    options: { shouldCreateUser: true, emailRedirectTo: `${await siteOrigin()}/auth/callback?next=/learn&m=email_link` },
+  });
+  if (error) return { error: "Couldn't send the email just now. Try again soon, or reset their PIN." };
+  await logEvent(s, "person.email_link", { learner_id: id });
+  return { ok: `Sign-in link sent to ${p.email}.` };
+}
+
+/** Turns this device into the team's shared tablet (name list + PIN pad). */
+export async function startTablet() {
+  const s = await requireStaff();
+  if (!s.org.login_settings.tablet) redirect("/admin/settings");
+  const { setTablet } = await import("@/lib/tablet");
+  await setTablet(s.org.id);
+  await logEvent(s, "tablet.setup");
+  await supabaseServer().then((sb) => sb.auth.signOut({ scope: "local" }));
+  redirect("/tablet");
 }

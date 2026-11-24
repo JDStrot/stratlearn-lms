@@ -3,9 +3,11 @@ import { readSession } from "@/lib/session";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { LoginForm } from "./login-form";
+import { providerFlags } from "@/lib/learner-auth";
 
-export default async function Home() {
+export default async function Home({ searchParams }: { searchParams: Promise<{ e?: string }> }) {
   if (await readSession()) redirect("/learn");
+  const { e } = await searchParams;
   return (
     <>
       <SiteHeader />
@@ -28,7 +30,7 @@ export default async function Home() {
               Sign in <em className="text-violet">your</em> way
             </h2>
             <p className="mb-6 text-muted">Choose what works for you.</p>
-            <LoginForm />
+            <LoginForm flags={providerFlags()} error={e} />
             <p className="mt-6 border-t border-line pt-4 text-center text-sm text-muted">
               Manager? <a href="/admin/login">Sign in to the manager console</a>
             </p>

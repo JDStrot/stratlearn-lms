@@ -1,6 +1,6 @@
 import { canManageTeam, requireStaff } from "@/lib/staff";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { removeGroup, removeStaff } from "../../actions";
+import { removeGroup, removeStaff, startTablet } from "../../actions";
 import { PageHead } from "../../ui";
 import { AddGroup, AddStaff, LoginOptions, TeamForm } from "./forms";
 
@@ -30,6 +30,16 @@ export default async function Settings() {
           <h2 className="mb-1 text-3xl">Sign-in <em>options</em></h2>
           <p className="mb-4 text-sm text-muted">Workers pick whichever way is easiest. Turn off anything your team won&apos;t use.</p>
           <LoginOptions settings={s.org.login_settings} disabled={!admin} />
+          {s.org.login_settings.tablet && (
+            <form action={startTablet} className="mt-5 rounded-[12px] bg-mist/60 p-4">
+              <p className="mb-3 text-sm">
+                <b className="text-plum">Setting up a break-room tablet?</b> Open this page on the tablet and tap below. It
+                signs you out and shows your team&apos;s names with a PIN pad. People are signed out when they tap I&apos;m done
+                or after 5 quiet minutes.
+              </p>
+              <button className="btn btn-primary btn-sm">Make this device the team tablet</button>
+            </form>
+          )}
         </section>
 
         {(["role", "location"] as const).map((kind) => {
