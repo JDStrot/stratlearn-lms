@@ -14,12 +14,16 @@ export function LearnView({
   es,
   items,
   certByCourse = {},
+  preview = false,
 }: {
   name: string;
   es: boolean;
   items: LearnItem[];
   certByCourse?: Record<string, string>;
+  /** Manager "view as" mode: same screen, nothing clickable, nothing recorded. */
+  preview?: boolean;
 }) {
+  const Go = preview ? PreviewBox : Link;
   const todo = items.filter((i) => !i.completedAt);
   const done = items.filter((i) => i.completedAt);
   const pct = items.length ? Math.round((done.length / items.length) * 100) : 0;
@@ -98,7 +102,7 @@ export function LearnView({
             <ul className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {todo.map(({ course, dueAt }) => (
                 <li key={course.id}>
-                  <Link
+                  <Go
                     href={`/play/${course.slug}`}
                     className="card card-hover flex h-full flex-col overflow-hidden text-ink no-underline"
                   >
@@ -122,7 +126,7 @@ export function LearnView({
                         {es ? "Empezar" : "Start"}
                       </span>
                     </div>
-                  </Link>
+                  </Go>
                 </li>
               ))}
             </ul>
@@ -167,7 +171,7 @@ export function LearnView({
                         ✦
                       </span>
                     </span>
-                    <Link
+                    <Go
                       href={`/play/${course.slug}`}
                       className="flex-1 text-ink no-underline hover:text-violet"
                     >
@@ -178,7 +182,7 @@ export function LearnView({
                           {es ? "Repasar" : "Review"}
                         </span>
                       )}
-                    </Link>
+                    </Go>
                     {code && (
                       <Link
                         href={`/verify/${code}`}
@@ -207,4 +211,8 @@ function length(minutes: number, es: boolean) {
   const m = minutes % 60;
   const hr = es ? (h === 1 ? "hora" : "horas") : "hr";
   return m ? `${h} ${hr} ${m} min` : `${h} ${hr}`;
+}
+
+function PreviewBox({ className, children }: { href: string; className?: string; children: React.ReactNode }) {
+  return <div className={className}>{children}</div>;
 }

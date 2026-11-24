@@ -14,11 +14,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
   const db = supabaseAdmin();
   const { data: learner } = await db
     .from("learners")
-    .select("id, org_id")
+    .select("id, org_id, organizations(login_settings)")
     .eq("qr_token", token)
     .eq("is_active", true)
     .maybeSingle();
   if (!learner) return NextResponse.redirect(home);
+  const settings = (learner.organizations as unknown as { login_settings: { qr?: boolean } } | null)?.login_settings;
+  if (settings?.qr === false) return NextResponse.redirect(new URL("/?e=off", req.url));
 
   await db.from("learners").update({ last_login_at: new Date().toISOString() }).eq("id", learner.id);
 

@@ -1,28 +1,20 @@
 /**
- * Every way a learner can get in. The login screen reads this list, so turning
- * a method on later is a one-word change here (plus its wiring).
+ * Every way a learner can get in, for reference.
  *
- * live  = works today, shown as a real option
- * soon  = shown as a "coming soon" chip
- * off   = built or planned but hidden (for example SMS codes, off by default per client)
+ * PIN, QR badge, email + password, email link and Face ID / passkeys work on
+ * every deploy. Google, Apple and text codes need provider setup first and
+ * are switched on with the AUTH_GOOGLE, AUTH_APPLE and AUTH_SMS environment
+ * variables (set to "on"). Each team can also turn any method off in
+ * Team settings (organizations.login_settings); text codes start off.
  */
-export type LoginMethodStatus = "live" | "soon" | "off";
-
-export type LoginMethod = {
-  id: "pin" | "qr" | "email-password" | "email-link" | "google" | "apple" | "passkey" | "sms";
-  label: string;
-  status: LoginMethodStatus;
-};
-
-export const LOGIN_METHODS: LoginMethod[] = [
-  { id: "pin", label: "Team code + PIN", status: "live" },
-  { id: "qr", label: "Scan my QR badge", status: "live" },
-  { id: "email-password", label: "Email + password", status: "soon" },
-  { id: "email-link", label: "Email me a link", status: "soon" },
-  { id: "google", label: "Google", status: "soon" },
-  { id: "apple", label: "Apple", status: "soon" },
-  { id: "passkey", label: "Face ID / passkey", status: "soon" },
-  { id: "sms", label: "Text me a code", status: "off" },
-];
-
-export const comingSoonMethods = () => LOGIN_METHODS.filter((m) => m.status === "soon");
+export const LOGIN_METHODS = [
+  { id: "pin", label: "Team code + PIN" },
+  { id: "qr", label: "Scan my QR badge" },
+  { id: "email_password", label: "Email + password" },
+  { id: "email_link", label: "Email me a link" },
+  { id: "passkey", label: "Face ID / fingerprint" },
+  { id: "google", label: "Google", env: "AUTH_GOOGLE" },
+  { id: "apple", label: "Apple", env: "AUTH_APPLE" },
+  { id: "sms", label: "Text me a code", env: "AUTH_SMS" },
+  { id: "tablet", label: "Shared tablet: pick your name + PIN" },
+] as const;
