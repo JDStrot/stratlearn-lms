@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireLearner } from "@/lib/learner";
 import { assignedCourseBySlug } from "@/lib/course-access";
+import { Logo } from "@/components/logo";
 import { CoursePlayer } from "./player";
 
 export default async function PlayPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -9,15 +10,19 @@ export default async function PlayPage({ params }: { params: Promise<{ slug: str
   const learner = await requireLearner();
   const course = await assignedCourseBySlug(learner, slug);
   if (!course) notFound();
+  const es = learner.preferred_language === "es";
 
   return (
-    <main className="flex h-dvh flex-col">
-      <nav className="flex items-center gap-3 border-b border-pink-100 bg-card px-4 py-2">
-        <Link href="/learn" className="rounded-xl px-2 py-1 text-sm text-muted hover:bg-pink-50">
-          ← {learner.preferred_language === "es" ? "Mis cursos" : "My courses"}
+    <main id="main" className="flex h-dvh flex-col">
+      <nav aria-label="Course" className="on-dark flex min-h-[56px] items-center gap-3 px-4">
+        <Link href="/learn" className="label rounded-full px-3 py-3 no-underline hover:text-white">
+          ← {es ? "Mis cursos" : "My courses"}
         </Link>
-        <span className="truncate text-sm font-semibold">
-          {(learner.preferred_language === "es" && course.title_es) || course.title}
+        <span className="min-w-0 flex-1 truncate text-center font-serif text-xl text-white">
+          {(es && course.title_es) || course.title}
+        </span>
+        <span className="hidden w-[130px] overflow-hidden sm:block [&_img]:w-[130px]">
+          <Logo tone="light" />
         </span>
       </nav>
       <CoursePlayer slug={course.slug} lang={learner.preferred_language} />

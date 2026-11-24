@@ -21,3 +21,10 @@ Gamified, bilingual training platform for frontline teams.
   passes the final check. The player then saves the completion, certificate
   and badge (`/api/completions`).
 - Demo login: team `DEMO`, name `lottie`, PIN `1234`.
+
+## Course card pictures
+
+Each course card on the learner home shows the course's own Lottie title art
+from `public/course-art/<slug>.jpg`. After adding or changing courses, run
+`node scripts/make-course-art.mjs` (or pass one slug) to make the pictures,
+then commit them. Needs Playwright with Chromium.
