@@ -29,6 +29,9 @@ export default async function Home() {
             </h2>
             <p className="mb-6 text-muted">Choose what works for you.</p>
             <LoginForm />
+            <p className="mt-6 border-t border-line pt-4 text-center text-sm text-muted">
+              Manager? <a href="/admin/login">Sign in to the manager console</a>
+            </p>
           </section>
         </div>
       </main>

@@ -2,6 +2,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { supabaseAdmin } from "./supabase/admin";
 import { readSession } from "./session";
+import { learnerStatuses, type AssignmentRow, type CompletionRow } from "./status";
 
 export type Learner = {
   id: string;
@@ -38,7 +39,8 @@ export async function requireLearner(): Promise<Learner> {
 
 /**
  * Courses assigned to this learner: directly, through their job role or
- * location, or to the whole organization.
+ * location, or to the whole organization. Repeating training (retraining
+ * clocks) shows up as "to do" again once the last completion runs out.
  */
 export async function assignedCourses(learner: Learner) {
   const targets = [
@@ -52,28 +54,24 @@ export async function assignedCourses(learner: Learner) {
   const [{ data: rows }, { data: done }] = await Promise.all([
     db
       .from("assignments")
-      .select("due_at, courses!inner(id, slug, title, title_es, minutes, storage_path, version, is_published)")
+      .select(
+        "id, course_id, learner_id, job_role_id, location_id, due_at, recurrence_months, created_at, courses!inner(id, slug, title, title_es, minutes, storage_path, version, is_published)",
+      )
       .eq("org_id", learner.org_id)
       .eq("courses.is_published", true)
       .or(targets.join(",")),
-    db.from("completions").select("course_id, completed_at").eq("learner_id", learner.id),
+    db.from("completions").select("learner_id, course_id, completed_at").eq("learner_id", learner.id),
   ]);
 
-  const completed = new Map<string, string>();
-  for (const c of done ?? []) {
-    const prev = completed.get(c.course_id);
-    if (!prev || prev < c.completed_at) completed.set(c.course_id, c.completed_at);
-  }
-
-  const byCourse = new Map<string, { course: Course; dueAt: string | null; completedAt: string | null }>();
+  const courses = new Map<string, Course>();
   for (const row of rows ?? []) {
     const course = row.courses as unknown as Course;
-    if (byCourse.has(course.id)) continue;
-    byCourse.set(course.id, {
-      course,
-      dueAt: row.due_at,
-      completedAt: completed.get(course.id) ?? null,
-    });
+    courses.set(course.id, course);
   }
-  return [...byCourse.values()];
+  const statuses = learnerStatuses(learner, (rows ?? []) as AssignmentRow[], (done ?? []) as CompletionRow[]);
+  return statuses.map((st) => ({
+    course: courses.get(st.courseId)!,
+    dueAt: st.dueAt,
+    completedAt: st.status === "done" ? st.completedAt : null,
+  }));
 }
