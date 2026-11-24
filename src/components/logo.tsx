@@ -1,19 +1,29 @@
+/* eslint-disable @next/next/no-img-element */
+
 /**
- * STRATLEARN wordmark. Placeholder text version until the logo files from
- * stratlearn.co (logo.png, logo-tagline-rev.png) are added to public/brand/.
+ * STRATLEARN logo from Jesse's Logo Kit 3 (public/brand/).
+ * dark  = plum + violet wordmark for light backgrounds
+ * light = white + lilac wordmark for dark backgrounds (tagline version in the footer)
  */
 export function Logo({ tone = "dark", tagline = false }: { tone?: "dark" | "light"; tagline?: boolean }) {
-  const color = tone === "light" ? "text-white" : "text-plum";
+  if (tagline) {
+    return (
+      <img
+        src="/brand/logo-tagline-rev.png"
+        alt="STRATLEARN, The Strategic Learning Co."
+        width={800}
+        height={199}
+        className="h-auto w-[220px] sm:w-[260px]"
+      />
+    );
+  }
   return (
-    <span className={`inline-flex flex-col leading-none ${color}`}>
-      <span className="font-label text-[1.35rem] font-semibold tracking-[0.2em]">
-        STRATLEARN<span aria-hidden className={tone === "light" ? "text-lilac" : "text-violet"}> ✦</span>
-      </span>
-      {tagline && (
-        <span className={`mt-1.5 font-serif text-base italic ${tone === "light" ? "text-lilac" : "text-violet"}`}>
-          The Strategic Learning Co.
-        </span>
-      )}
-    </span>
+    <img
+      src={tone === "light" ? "/brand/logo-rev.png" : "/brand/logo.png"}
+      alt="STRATLEARN"
+      width={720}
+      height={119}
+      className="h-auto w-[150px] sm:w-[180px]"
+    />
   );
 }

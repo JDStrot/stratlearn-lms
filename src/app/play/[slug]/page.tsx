@@ -21,7 +21,7 @@ export default async function PlayPage({ params }: { params: Promise<{ slug: str
         <span className="min-w-0 flex-1 truncate text-center font-serif text-xl text-white">
           {(es && course.title_es) || course.title}
         </span>
-        <span className="hidden scale-75 sm:block">
+        <span className="hidden w-[130px] overflow-hidden sm:block [&_img]:w-[130px]">
           <Logo tone="light" />
         </span>
       </nav>
