@@ -127,3 +127,15 @@ export async function saveCourseDefault(_p: OwnerState, f: FormData): Promise<Ow
   revalidatePath("/admin", "layout");
   return { ok: "Saved." };
 }
+
+/** Contact Us inbox: mark a message handled, or move it back to new. */
+export async function setFeedbackStatus(f: FormData) {
+  await requireOwner();
+  const status = str(f, "status") === "done" ? "done" : "new";
+  await supabaseAdmin()
+    .from("feedback_messages")
+    .update({ status, handled_at: status === "done" ? new Date().toISOString() : null })
+    .eq("id", str(f, "id"));
+  revalidatePath("/admin/owner/feedback");
+  revalidatePath("/admin/owner");
+}

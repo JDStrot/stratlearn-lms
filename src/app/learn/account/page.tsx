@@ -4,7 +4,6 @@ import { readSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { logout } from "../../actions";
 import { removePasskey, setLanguage } from "./actions";
 import { AddPasskey, EmailPasswordForm } from "./forms";
 
@@ -23,13 +22,7 @@ export default async function Account() {
 
   return (
     <>
-      <SiteHeader
-        signOut={
-          <form action={logout}>
-            <button className="btn btn-ghost btn-sm">{es ? "Salir" : "Sign out"}</button>
-          </form>
-        }
-      />
+      <SiteHeader es={es} />
       <main id="main" className="flex-1 bg-paper">
         <div className="wrap flex max-w-3xl flex-col gap-6 py-12">
           <p><Link href="/learn" className="label">← {es ? "Mis cursos" : "My courses"}</Link></p>
@@ -93,7 +86,7 @@ export default async function Account() {
           </section>
         </div>
       </main>
-      <SiteFooter />
+      <SiteFooter es={es} />
     </>
   );
 }
