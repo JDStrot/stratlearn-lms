@@ -39,7 +39,7 @@ export function ContactForm({
 
   const kinds: [Kind, string][] = es
     ? [["feedback", "Opinión"], ["idea", "Idea para mejorar"], ["course_issue", "Problema en un curso"], ["other", "Otra cosa"]]
-    : [["feedback", "Feedback"], ["idea", "Idea to improve"], ["course_issue", "Problem in a course"], ["other", "Something else"]];
+    : [["feedback", "Feedback"], ["idea", "Idea to improve"], ["course_issue", "Course problem"], ["other", "Something else"]];
   const mineIds = new Set(mine.map((c) => c.id));
   const rest = all.filter((c) => !mineIds.has(c.id));
 
