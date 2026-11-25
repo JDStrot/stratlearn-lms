@@ -59,12 +59,17 @@ export function EditPerson({
         <Field label="Mobile (optional)"><input name="phone" type="tel" defaultValue={p.phone ?? ""} className="field" /></Field>
         <Field label="Employee ID"><input name="employeeId" defaultValue={p.employee_id ?? ""} className="field" /></Field>
       </div>
-      <Field label="Language">
-        <select name="language" defaultValue={p.preferred_language} className="field">
-          <option value="en">English</option>
-          <option value="es">Español</option>
-        </select>
-      </Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Language">
+          <select name="language" defaultValue={p.preferred_language} className="field">
+            <option value="en">English</option>
+            <option value="es">Español</option>
+          </select>
+        </Field>
+        <Field label="Start date" hint="New-hire due dates count from here">
+          <input name="startDate" type="date" defaultValue={p.start_date ?? ""} className="field" />
+        </Field>
+      </div>
       <Notice state={state} />
       <button disabled={pending} className="btn btn-primary btn-sm self-start">{pending ? "Saving..." : "Save"}</button>
     </form>

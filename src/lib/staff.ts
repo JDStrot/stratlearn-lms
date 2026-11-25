@@ -46,6 +46,8 @@ export type Staff = {
   isPlatformAdmin: boolean;
   org: Org;
   orgs: { id: string; name: string }[];
+  /** Managers limited to some locations; null = the whole team. */
+  locationIds: string[] | null;
 };
 
 export const ORG_COOKIE = "sl_org";
@@ -65,18 +67,22 @@ export async function requireStaff(): Promise<Staff> {
   const db = supabaseAdmin();
   const ORG_COLS = "id, name, join_code, default_language, login_settings";
   const [{ data: rows }, { data: platform }] = await Promise.all([
-    db.from("staff_members").select(`org_id, role, organizations(${ORG_COLS})`).eq("user_id", user.id),
+    db.from("staff_members").select(`org_id, role, location_ids, organizations(${ORG_COLS})`).eq("user_id", user.id),
     db.from("platform_admins").select("user_id").eq("user_id", user.id).maybeSingle(),
   ]);
   const isPlatformAdmin = !!platform;
 
   // STRATLEARN owners can open any client team ("view as manager").
-  let memberships = (rows ?? []).map((r) => ({ role: r.role as StaffRole, org: r.organizations as unknown as Org }));
+  let memberships = (rows ?? []).map((r) => ({
+    role: r.role as StaffRole,
+    org: r.organizations as unknown as Org,
+    locationIds: (r.location_ids as string[] | null)?.length ? (r.location_ids as string[]) : null,
+  }));
   if (isPlatformAdmin) {
     const { data: all } = await db.from("organizations").select(ORG_COLS).order("name");
     const mine = new Set(memberships.map((m) => m.org.id));
     memberships = memberships.concat(
-      ((all ?? []) as unknown as Org[]).filter((o) => !mine.has(o.id)).map((org) => ({ role: "owner" as StaffRole, org })),
+      ((all ?? []) as unknown as Org[]).filter((o) => !mine.has(o.id)).map((org) => ({ role: "owner" as StaffRole, org, locationIds: null })),
     );
   }
   if (!memberships.length) redirect("/admin/login?e=noaccess");
@@ -93,7 +99,14 @@ export async function requireStaff(): Promise<Staff> {
     isPlatformAdmin,
     org,
     orgs: memberships.map((x) => ({ id: x.org.id, name: x.org.name })),
+    // Only plain managers can be limited; owners and admins see everything.
+    locationIds: m.role === "manager" ? m.locationIds : null,
   };
+}
+
+/** True if this manager may see a person at this location. */
+export function inScope(s: Staff, locationId: string | null) {
+  return !s.locationIds || (!!locationId && s.locationIds.includes(locationId));
 }
 
 /** Owners and admins can change team settings and staff; managers run training. */

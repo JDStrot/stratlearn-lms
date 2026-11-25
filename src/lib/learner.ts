@@ -12,6 +12,8 @@ export type Learner = {
   preferred_language: "en" | "es";
   job_role_id: string | null;
   location_id: string | null;
+  start_date?: string | null;
+  created_at?: string | null;
 };
 
 export type Course = {
@@ -30,7 +32,7 @@ export async function requireLearner(): Promise<Learner> {
   if (!session) redirect("/");
   const { data } = await supabaseAdmin()
     .from("learners")
-    .select("id, org_id, display_name, preferred_language, job_role_id, location_id, organizations(status)")
+    .select("id, org_id, display_name, preferred_language, job_role_id, location_id, start_date, created_at, organizations(status)")
     .eq("id", session.lid)
     .eq("is_active", true)
     .maybeSingle();

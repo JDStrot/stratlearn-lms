@@ -1,11 +1,12 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
   addGroup,
   addStaff,
   saveLoginSettings,
   saveTeam,
+  setStaffScope,
   type FormState,
   type StaffState,
 } from "../../actions";
@@ -81,19 +82,33 @@ export function AddGroup({ kind }: { kind: "role" | "location" }) {
   );
 }
 
-export function AddStaff() {
+export function AddStaff({ locations = [] }: { locations?: { id: string; name: string }[] }) {
   const [state, action, pending] = useActionState<StaffState, FormData>(addStaff, {});
+  const [role, setRole] = useState("manager");
   return (
     <form action={action} className="grid gap-4 rounded-[14px] bg-mist/50 p-5 md:grid-cols-[1fr_1fr_auto_auto] md:items-end">
       <Field label="Their name"><input name="name" className="field" /></Field>
       <Field label="Their email"><input name="email" type="email" required className="field" /></Field>
       <Field label="Access">
-        <select name="role" className="field">
+        <select name="role" value={role} onChange={(e) => setRole(e.target.value)} className="field">
           <option value="manager">Manager</option>
           <option value="admin">Admin</option>
         </select>
       </Field>
       <button disabled={pending} className="btn btn-primary btn-sm">Add manager</button>
+      {role === "manager" && locations.length > 0 && (
+        <fieldset className="md:col-span-4">
+          <legend className="label mb-2 text-plum">Locations they manage</legend>
+          <p className="mb-2 text-sm text-muted">Leave all unticked for the whole team.</p>
+          <div className="flex flex-wrap gap-3">
+            {locations.map((l) => (
+              <label key={l.id} className="chip gap-2">
+                <input type="checkbox" name="locations" value={l.id} className="accent-plum" /> {l.name}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
       <div className="md:col-span-4">
         {state.password ? (
           <p role="status" className="rounded-[10px] border border-success/30 bg-success/5 px-4 py-3">
@@ -105,5 +120,25 @@ export function AddStaff() {
         )}
       </div>
     </form>
+  );
+}
+
+/** Which locations a manager can see (none ticked = whole team). */
+export function StaffScope({ userId, locations, on }: { userId: string; locations: { id: string; name: string }[]; on: string[] }) {
+  const [state, action, pending] = useActionState<FormState, FormData>(setStaffScope, {});
+  return (
+    <details className="mt-2">
+      <summary className="label cursor-pointer text-muted">{on.length ? `${on.length} location${on.length === 1 ? "" : "s"}` : "All locations"} · change</summary>
+      <form action={action} className="mt-2 flex flex-wrap items-center gap-3">
+        <input type="hidden" name="userId" value={userId} />
+        {locations.map((l) => (
+          <label key={l.id} className="chip gap-2">
+            <input type="checkbox" name="locations" value={l.id} defaultChecked={on.includes(l.id)} className="accent-plum" /> {l.name}
+          </label>
+        ))}
+        <button disabled={pending} className="btn btn-ghost btn-sm">Save</button>
+        <Notice state={state} />
+      </form>
+    </details>
   );
 }

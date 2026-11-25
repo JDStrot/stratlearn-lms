@@ -12,7 +12,7 @@ export default async function PreviewAs({ params }: { params: Promise<{ id: stri
   const db = supabaseAdmin();
   const { data } = await db
     .from("learners")
-    .select("id, org_id, display_name, preferred_language, job_role_id, location_id")
+    .select("id, org_id, display_name, preferred_language, job_role_id, location_id, start_date, created_at")
     .eq("id", id)
     .eq("org_id", s.org.id)
     .maybeSingle();

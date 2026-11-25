@@ -10,7 +10,7 @@ type Search = Promise<{ q?: string; role?: string; location?: string; show?: str
 export default async function PeoplePage({ searchParams }: { searchParams: Search }) {
   const sp = await searchParams;
   const s = await requireStaff();
-  const team = await loadTeam(s.org.id);
+  const team = await loadTeam(s.org.id, s.locationIds);
   const status = new Map(teamStatus(team).map((r) => [r.person.id, r.statuses]));
   const q = (sp.q ?? "").toLowerCase();
   const people = team.people.filter(

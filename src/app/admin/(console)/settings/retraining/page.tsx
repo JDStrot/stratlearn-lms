@@ -13,7 +13,7 @@ export default async function Retraining({ searchParams }: { searchParams: Promi
   const { all } = await searchParams;
   const s = await requireStaff();
   const admin = canManageTeam(s);
-  const team = await loadTeam(s.org.id);
+  const team = await loadTeam(s.org.id, s.locationIds);
   const { data: info } = await supabaseAdmin()
     .from("courses")
     .select("*")

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { logEvent, requireStaff } from "@/lib/staff";
+import { inScope, logEvent, requireStaff } from "@/lib/staff";
 import { STATUS_LABEL, isCurrent, repeatLabel } from "@/lib/status";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { statusRows, toCsv } from "../rows";
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     const { data } = await db
       .from("completions")
       .select(
-        "completed_at, course_version, language, score, learners(display_name, username, employee_id), courses(slug, title), certificates(verify_code, expires_at)",
+        "completed_at, course_version, language, score, learners(display_name, username, employee_id, location_id), courses(slug, title), certificates(verify_code, expires_at)",
       )
       .eq("org_id", s.org.id)
       .order("completed_at", { ascending: false })
@@ -30,14 +30,14 @@ export async function GET(req: NextRequest) {
       course_version: number;
       language: string | null;
       score: number | null;
-      learners: { display_name: string; username: string; employee_id: string | null } | null;
+      learners: { display_name: string; username: string; employee_id: string | null; location_id: string | null } | null;
       courses: { slug: string; title: string } | null;
       certificates: { verify_code: string; expires_at: string | null }[] | { verify_code: string; expires_at: string | null } | null;
     };
     const origin = req.nextUrl.origin;
     csv = toCsv(
       ["Name", "Sign-in name", "Employee ID", "Course", "Course ID", "Version", "Completed (UTC)", "Valid until", "Score", "Language", "Certificate code", "Verify link"],
-      ((data ?? []) as unknown as Row[]).map((r) => {
+      ((data ?? []) as unknown as Row[]).filter((r) => inScope(s, r.learners?.location_id ?? null)).map((r) => {
         const cert = Array.isArray(r.certificates) ? r.certificates[0] : r.certificates;
         return [
           r.learners?.display_name,
@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
       role: p.get("role") ?? undefined,
       location: p.get("location") ?? undefined,
       course: p.get("course") ?? undefined,
-    });
+    }, s.locationIds);
     csv = toCsv(
       ["Name", "Sign-in name", "Employee ID", "Role", "Location", "Course", "Status", "Compliant now", "Due / retrain by", "Last finished", "Version finished", "Score", "Repeats"],
       rows.map((r) => [
