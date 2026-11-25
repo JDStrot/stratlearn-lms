@@ -32,6 +32,7 @@ export default async function ConsoleLayout({ children }: { children: React.Reac
           </div>
           <div className="flex items-center gap-3">
             <span className="hidden text-sm text-muted md:inline">{s.email}</span>
+            <Link href="/contact" className="label hidden text-plum no-underline hover:text-violet sm:inline">Contact us</Link>
             <form action={staffSignOut}>
               <button className="btn btn-ghost btn-sm">Sign out</button>
             </form>

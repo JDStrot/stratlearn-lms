@@ -2,7 +2,6 @@ import { assignedCourses, requireLearner } from "@/lib/learner";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { logout } from "../actions";
 import { LearnView } from "./learn-view";
 import { IdleSignOut } from "./kiosk";
 import { readSession } from "@/lib/session";
@@ -37,20 +36,12 @@ export default async function LearnPage() {
   return (
     <>
       <SiteHeader
-        signOut={
-          kiosk ? (
-            <form action="/tablet/done" method="post">
-              <button className="btn btn-primary btn-sm">{es ? "Terminé" : "I'm done"}</button>
-            </form>
-          ) : (
-            <span className="flex items-center gap-2">
-              <Link href="/learn/account" className="btn btn-ghost btn-sm">
-                {es ? "Mi acceso" : "My sign-in"}
-              </Link>
-              <form action={logout}>
-                <button className="btn btn-ghost btn-sm">{es ? "Salir" : "Sign out"}</button>
-              </form>
-            </span>
+        es={es}
+        extra={
+          !kiosk && (
+            <Link href="/learn/account" className="btn btn-ghost btn-sm">
+              {es ? "Mi acceso" : "My sign-in"}
+            </Link>
           )
         }
       />
@@ -71,7 +62,7 @@ export default async function LearnPage() {
           </ul>
         </section>
       )}
-      <SiteFooter />
+      <SiteFooter es={es} />
     </>
   );
 }

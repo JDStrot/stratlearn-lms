@@ -13,7 +13,7 @@ export const metadata = { title: "STRATLEARN · Owner portal" };
 export default async function OwnerHome() {
   await requireOwner();
   const db = supabaseAdmin();
-  const [orgs, learners, assignments, completions, packs, defaults, teamRules] = await Promise.all([
+  const [orgs, learners, assignments, completions, packs, defaults, teamRules, newFeedback] = await Promise.all([
     db.from("organizations").select("*").order("name"),
     db.from("learners").select("id, org_id, job_role_id, location_id, is_active, last_login_at").limit(100000),
     db.from("assignments").select("*").limit(100000),
@@ -21,6 +21,7 @@ export default async function OwnerHome() {
     db.from("packs").select("id, title").eq("is_published", true).order("title"),
     db.from("courses").select("id, default_recurrence_months").not("default_recurrence_months", "is", null),
     db.from("org_course_settings").select("org_id, course_id, recurrence_months"),
+    db.from("feedback_messages").select("id", { count: "exact", head: true }).eq("status", "new"),
   ]);
   const courseDefault = new Map((defaults.error ? [] : defaults.data ?? []).map((c) => [c.id as string, c.default_recurrence_months as number | null]));
 
@@ -66,6 +67,9 @@ export default async function OwnerHome() {
         <Link href="/admin/owner/dashboards" className="btn btn-primary btn-sm">Platform dashboards</Link>
         <Link href="/admin/owner/library" className="btn btn-ghost btn-sm">Course library</Link>
         <Link href="/admin/owner/certificates" className="btn btn-ghost btn-sm">Certificate lookup</Link>
+        <Link href="/admin/owner/feedback" className="btn btn-ghost btn-sm">
+          Contact us messages{newFeedback.count ? ` (${newFeedback.count} new)` : ""}
+        </Link>
       </PageHead>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
