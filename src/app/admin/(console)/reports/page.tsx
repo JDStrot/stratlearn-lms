@@ -38,9 +38,10 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
           <span className="label text-plum">Status</span>
           <select name="status" defaultValue={f.status ?? ""} className="field">
             <option value="">All</option>
-            <option value="late">Overdue</option>
+            <option value="late">Overdue (incl. retraining)</option>
+            <option value="renew">Retraining coming up</option>
             <option value="due">To do</option>
-            <option value="done">Done</option>
+            <option value="done">Done and current</option>
           </select>
         </label>
         <label className="flex flex-col gap-1.5">
@@ -74,7 +75,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
               <th className="px-4 py-3 font-semibold">Person</th>
               <th className="px-4 py-3 font-semibold">Course</th>
               <th className="px-4 py-3 font-semibold">Status</th>
-              <th className="px-4 py-3 font-semibold">Due</th>
+              <th className="px-4 py-3 font-semibold">Due / retrain by</th>
               <th className="px-4 py-3 font-semibold">Finished</th>
             </tr>
           </thead>
@@ -91,7 +92,11 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
                 <td className="px-4 py-3">{r.course}</td>
                 <td className="px-4 py-3"><StatusChip status={r.status} /></td>
                 <td className="px-4 py-3">{fmtDate(r.dueAt)}</td>
-                <td className="px-4 py-3">{fmtDate(r.completedAt)}{r.score != null ? ` · ${r.score}%` : ""}</td>
+                <td className="px-4 py-3">
+                  {fmtDate(r.completedAt ?? r.lastFinishedAt)}
+                  {r.version ? ` · v${r.version}` : ""}
+                  {r.score != null ? ` · ${r.score}%` : ""}
+                </td>
               </tr>
             ))}
           </tbody>

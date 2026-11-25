@@ -1,5 +1,5 @@
 {
- "_readme": "Launch catalog. Every course listed here is uploaded to Supabase Storage and published on each production deploy (scripts/sync-courses.mjs). Add a course: put its bilingual.html in courses/lottie/<slug>/ and list the slug here.",
+ "_readme": "Launch catalog. Every course listed here is uploaded to Supabase Storage and published on each production deploy (scripts/sync-courses.mjs). Add a course: put its bilingual.html in courses/lottie/<slug>/ and list the slug here. \"retrain\" = starting retraining rule (months) for NEW courses; after that the owner portal course library decides. \"versionNotes\" = force a new version on the next deploy with this note (e.g. the yearly Harassment Prevention refresh); old versions and everyone's records are kept.",
  "courses": [
   "harassment-prevention",
   "harassment-prevention-ca",
@@ -221,5 +221,80 @@
  "demo": {
   "join_code": "DEMO",
   "assign": "all"
- }
+ },
+ "retrain": {
+  "harassment-prevention": {
+   "months": 12,
+   "note": "Best practice: yearly (STRATLEARN refreshes it every year)"
+  },
+  "harassment-prevention-ca": {
+   "months": 24,
+   "note": "California law: every 2 years"
+  },
+  "harassment-prevention-ca-supervisors": {
+   "months": 24,
+   "note": "California law: every 2 years"
+  },
+  "harassment-prevention-ny": {
+   "months": 12,
+   "note": "New York law: every year"
+  },
+  "harassment-prevention-nyc": {
+   "months": 12,
+   "note": "New York law: every year"
+  },
+  "harassment-prevention-il": {
+   "months": 12,
+   "note": "Illinois law: every year"
+  },
+  "harassment-prevention-il-restaurants": {
+   "months": 12,
+   "note": "Illinois law: every year"
+  },
+  "harassment-prevention-ct": {
+   "months": 120,
+   "note": "Connecticut law: refresher at least every 10 years"
+  },
+  "workplace-violence-ca": {
+   "months": 12,
+   "note": "California SB 553: every year"
+  },
+  "workplace-violence-ny-retail": {
+   "months": 12,
+   "note": "New York Retail Worker Safety Act: check current rule (set to yearly to be safe)"
+  },
+  "workplace-violence-healthcare": {
+   "months": 12,
+   "note": "State healthcare violence laws: yearly in most states"
+  },
+  "bloodborne-pathogens": {
+   "months": 12,
+   "note": "OSHA 1910.1030: every year"
+  },
+  "bloodborne-pathogens-yearly": {
+   "months": 12,
+   "note": "OSHA 1910.1030: every year"
+  },
+  "respiratory-protection-yearly": {
+   "months": 12,
+   "note": "OSHA 1910.134: every year"
+  },
+  "hearing-conservation-yearly": {
+   "months": 12,
+   "note": "OSHA 1910.95: every year"
+  },
+  "fire-safety": {
+   "months": 12,
+   "note": "OSHA 1910.157: fire extinguisher training every year"
+  },
+  "mandated-reporter-yearly": {
+   "months": 12,
+   "note": "Yearly (e.g. California schools)"
+  },
+  "asbestos-awareness": {
+   "months": 12,
+   "note": "OSHA asbestos standards: every year"
+  }
+ },
+ "versionNotes": {}
 }

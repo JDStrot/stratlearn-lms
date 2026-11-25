@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireStaff } from "@/lib/staff";
-import { learnerStatuses } from "@/lib/status";
+import { STATUS_ORDER, learnerStatuses, repeatLabel } from "@/lib/status";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { newBadge, removeAssignment, setActive, unlockPerson } from "../../../actions";
 import { fmtDate, loadTeam, nameOf } from "../../../data";
@@ -15,10 +15,9 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
   const p = team.people.find((x) => x.id === id);
   if (!p) notFound();
 
-  const statuses = learnerStatuses(p, team.assignments, team.completions);
+  const statuses = learnerStatuses(p, team.assignments, team.completions, new Date(), team.rules.timing);
   const course = new Map(team.courses.map((c) => [c.id, c]));
-  const order = { overdue: 0, expired: 1, due: 2, done: 3 } as const;
-  statuses.sort((a, b) => order[a.status] - order[b.status]);
+  statuses.sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]);
   const direct = team.assignments.filter((a) => a.learner_id === p.id);
 
   const { data: certs } = await supabaseAdmin()
@@ -62,7 +61,10 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
                       <span className="font-medium">{c?.title ?? "Course"}</span>
                       <span className="block text-sm text-muted">
                         {st.completedAt ? `Finished ${fmtDate(st.completedAt)}` : st.dueAt ? `Due ${fmtDate(st.dueAt)}` : "No due date"}
+                        {st.completedAt && st.completedVersion ? ` (v${st.completedVersion})` : ""}
                         {st.completedAt && st.recurrenceMonths ? ` · retrain by ${fmtDate(st.dueAt)}` : ""}
+                        {st.recurrenceMonths ? ` · repeats ${repeatLabel(st.recurrenceMonths).toLowerCase()}` : ""}
+                        {!st.completedAt && st.lastFinishedAt ? ` · last finished ${fmtDate(st.lastFinishedAt)}` : ""}
                         {st.score != null ? ` · score ${st.score}%` : ""}
                       </span>
                     </span>

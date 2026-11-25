@@ -28,6 +28,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
     slug: course.slug,
     courseVersion: course.version,
     completed: Boolean(item.completedAt),
+    round: item.completedAt ? "" : roundKey(item.lastFinishedAt, item.retakeAfter),
   });
   const html = hook + (await data.text());
 
@@ -38,4 +39,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
       "x-frame-options": "SAMEORIGIN",
     },
   });
+}
+
+/** Start of this retraining round: the later of the last finish and a retake request. */
+function roundKey(lastFinishedAt: string | null, retakeAfter: string | null) {
+  const t = Math.max(lastFinishedAt ? Date.parse(lastFinishedAt) : 0, retakeAfter ? Date.parse(retakeAfter) : 0);
+  return t ? String(t) : "";
 }

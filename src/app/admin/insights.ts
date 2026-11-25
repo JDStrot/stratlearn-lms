@@ -156,7 +156,7 @@ export function computeInsights(team: Team, f: Filter, allProgress: ProgressRow[
     let ok = 0;
     for (const r of rows) {
       if (r.person.created_at > iso) continue;
-      for (const st of learnerStatuses(r.person, as, cs, at)) {
+      for (const st of learnerStatuses(r.person, as, cs, at, team.rules.timing)) {
         tot++;
         if (isCurrent(bucketOf(st.status))) ok++;
       }

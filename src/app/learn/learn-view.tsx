@@ -6,6 +6,8 @@ export type LearnItem = {
   course: Course;
   dueAt: string | null;
   completedAt: string | null;
+  /** Finished before; back on the list for retraining or a retake. */
+  lastFinishedAt?: string | null;
 };
 
 /** Learner home: greeting band with progress, then courses to do and finished. */
@@ -100,7 +102,7 @@ export function LearnView({
             </p>
           ) : (
             <ul className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {todo.map(({ course, dueAt }) => (
+              {todo.map(({ course, dueAt, lastFinishedAt }) => (
                 <li key={course.id}>
                   <Go
                     href={`/play/${course.slug}`}
@@ -114,6 +116,9 @@ export function LearnView({
                       <div className="flex flex-wrap gap-2">
                         {course.minutes ? (
                           <span className="chip">{length(course.minutes, es)}</span>
+                        ) : null}
+                        {lastFinishedAt ? (
+                          <span className="chip">{es ? "Repaso" : "Retraining"}</span>
                         ) : null}
                         {dueAt ? (
                           <span className="chip">

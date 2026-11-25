@@ -97,3 +97,33 @@ export async function togglePublished(f: FormData) {
   await supabaseAdmin().from(table).update({ is_published: str(f, "on") === "1" }).eq("id", str(f, "id"));
   revalidatePath("/admin/owner/library");
 }
+
+/** The course's own retraining default, used by every client unless they change it. */
+export async function saveCourseDefault(_p: OwnerState, f: FormData): Promise<OwnerState> {
+  const s = await requireOwner();
+  const db = supabaseAdmin();
+  const id = str(f, "courseId");
+  const value = str(f, "repeat");
+  const months = value === "never" || value === "" ? null : Math.round(Number(value));
+  if (months !== null && !(months >= 1 && months <= 240)) return { error: "Pick 1 to 240 months." };
+  const { data: course, error } = await db
+    .from("courses")
+    .update({ default_recurrence_months: months })
+    .eq("id", id)
+    .select("title")
+    .maybeSingle();
+  if (error)
+    return {
+      error: /default_recurrence_months|schema cache/.test(error.message)
+        ? "This needs the retraining database update first."
+        : error.message,
+    };
+  await db.from("admin_events").insert({
+    org_id: s.org.id,
+    actor_id: s.userId,
+    action: "library.retraining",
+    details: { course: course?.title, months },
+  });
+  revalidatePath("/admin", "layout");
+  return { ok: "Saved." };
+}

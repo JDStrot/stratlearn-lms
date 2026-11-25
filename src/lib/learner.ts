@@ -2,7 +2,8 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { supabaseAdmin } from "./supabase/admin";
 import { readSession } from "./session";
-import { learnerStatuses, type AssignmentRow, type CompletionRow } from "./status";
+import { loadRetrainRules } from "./retrain";
+import { applyRetrainRules, isToDo, learnerStatuses, type AssignmentRow, type CompletionRow, type Status } from "./status";
 
 export type Learner = {
   id: string;
@@ -56,16 +57,18 @@ export async function assignedCourses(learner: Learner) {
   if (learner.location_id) targets.push(`location_id.eq.${learner.location_id}`);
 
   const db = supabaseAdmin();
-  const [{ data: rows }, { data: done }] = await Promise.all([
+  const [{ data: rows }, { data: done }, rules] = await Promise.all([
     db
       .from("assignments")
       .select(
-        "id, course_id, learner_id, job_role_id, location_id, due_at, recurrence_months, created_at, courses!inner(id, slug, title, title_es, minutes, storage_path, version, is_published)",
+        // "*" keeps this working before and after the retraining database update.
+        "*, courses!inner(id, slug, title, title_es, minutes, storage_path, version, is_published)",
       )
       .eq("org_id", learner.org_id)
       .eq("courses.is_published", true)
       .or(targets.join(",")),
-    db.from("completions").select("learner_id, course_id, completed_at").eq("learner_id", learner.id),
+    db.from("completions").select("learner_id, course_id, completed_at, course_version").eq("learner_id", learner.id),
+    loadRetrainRules(learner.org_id),
   ]);
 
   const courses = new Map<string, Course>();
@@ -73,10 +76,16 @@ export async function assignedCourses(learner: Learner) {
     const course = row.courses as unknown as Course;
     courses.set(course.id, course);
   }
-  const statuses = learnerStatuses(learner, (rows ?? []) as AssignmentRow[], (done ?? []) as CompletionRow[]);
+  const assignments = applyRetrainRules((rows ?? []) as AssignmentRow[], rules);
+  const statuses = learnerStatuses(learner, assignments, (done ?? []) as CompletionRow[], new Date(), rules.timing);
   return statuses.map((st) => ({
     course: courses.get(st.courseId)!,
+    status: st.status as Status,
     dueAt: st.dueAt,
-    completedAt: st.status === "done" ? st.completedAt : null,
+    recurrenceMonths: st.recurrenceMonths,
+    // A course coming up for retraining goes back on the to-do list.
+    completedAt: isToDo(st.status) ? null : st.completedAt,
+    lastFinishedAt: st.lastFinishedAt,
+    retakeAfter: st.retakeAfter,
   }));
 }

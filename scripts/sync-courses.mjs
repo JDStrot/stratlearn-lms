@@ -9,11 +9,21 @@
 //   3. adds or updates the packs and their role-path tabs
 //   4. switches the packs on for the demo team and assigns every course to it
 //
+// Course versions: each upload's fingerprint is saved in course_versions.
+// If a course file changed AND real learners (not the demo team) already
+// finished the current version, it is saved as a new version
+// (lottie/<slug>/v2/...) and the old file is kept, so past completions and
+// certificates keep pointing at what those learners actually took. Before
+// launch (no real finishes), a change simply replaces the file. To force a
+// new version (e.g. the yearly Harassment Prevention refresh), add the slug to
+// "versionNotes" in catalog.json with a note such as "2027 update".
+//
 // It only runs when VERCEL_ENV is "production" or SYNC_COURSES=1, so preview
 // builds of a pull request never touch the live catalog. It never fails the
 // build: problems are printed and the site deploys as before.
 //
 // Run it by hand: SYNC_COURSES=1 node --env-file=.env.local scripts/sync-courses.mjs
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -39,13 +49,29 @@ async function main() {
   if (readErr) throw new Error(`read courses: ${readErr.message}`);
   const bySlug = new Map(existing.map((c) => [c.slug, c]));
 
+  // Version archive (missing until the retraining/versions database update runs).
+  const vr = await db.from("course_versions").select("course_id, version, content_hash, notes");
+  const ctx = {
+    bySlug,
+    hasVersions: !vr.error,
+    versions: new Map((vr.data ?? []).map((v) => [`${v.course_id}|${v.version}`, v])),
+    maxVersion: new Map(),
+    demoOrgId: null,
+    notes: catalog.versionNotes ?? {},
+    retrain: catalog.retrain ?? {},
+  };
+  for (const v of vr.data ?? []) ctx.maxVersion.set(v.course_id, Math.max(ctx.maxVersion.get(v.course_id) ?? 0, v.version));
+  if (!ctx.hasVersions) console.log("[courses] version archive not set up yet; files are replaced in place");
+  const demo = await db.from("organizations").select("id").eq("join_code", catalog.demo.join_code).maybeSingle();
+  ctx.demoOrgId = demo.data?.id ?? null;
+
   // 1 + 2. Course files, rows and badges (a few at a time).
   const failed = [];
   const queue = [...catalog.courses];
   async function worker() {
     for (let slug = queue.shift(); slug; slug = queue.shift()) {
       try {
-        await syncCourse(db, slug, bySlug);
+        await syncCourse(db, slug, ctx);
       } catch (e) {
         failed.push(slug);
         console.error(`[courses] fail ${slug}: ${e.message}`);
@@ -129,21 +155,40 @@ async function main() {
   console.log(`[courses] ${ok} of ${catalog.courses.length} courses published, ${catalog.packs.length} packs`);
 }
 
-async function syncCourse(db, slug, bySlug) {
+async function syncCourse(db, slug, ctx) {
+  const { bySlug } = ctx;
   const html = await readFile(join(ROOT, "lottie", slug, "bilingual.html"));
   const head = html.toString("utf8", 0, Math.min(html.length, 4_000_000));
   const titles = head.match(/T=\{en:("(?:[^"\\]|\\.)*"),es:("(?:[^"\\]|\\.)*")\}/);
   const title = titles ? JSON.parse(titles[1]) : head.match(/<title>([^<]*)<\/title>/i)?.[1]?.trim() || slug;
   const title_es = titles ? JSON.parse(titles[2]) : null;
   const minutes = courseMinutes(head, slug);
+  const hash = createHash("sha256").update(html).digest("hex");
 
-  const version = bySlug.get(slug)?.version ?? 1;
+  const prev = bySlug.get(slug);
+  let version = prev?.version ?? 1;
+  let upload = true;
+  let newVersion = !prev;
+  if (prev && ctx.hasVersions) {
+    const cur = ctx.versions.get(`${prev.id}|${prev.version}`);
+    const note = ctx.notes[slug];
+    if (cur?.content_hash === hash) {
+      upload = false; // unchanged: nothing to do
+    } else if (cur?.content_hash && ((note && note !== cur.notes) || (await finishedByRealLearners(db, ctx, prev.id, prev.version)))) {
+      version = Math.max(ctx.maxVersion.get(prev.id) ?? prev.version, prev.version) + 1;
+      newVersion = true;
+      console.log(`[courses] ${slug}: new version v${version} (v${prev.version} kept for its records)`);
+    }
+  }
   const storage_path = `lottie/${slug}/v${version}/bilingual.html`;
-  const up = await db.storage
-    .from("courses")
-    .upload(storage_path, html, { contentType: "text/html; charset=utf-8", upsert: true });
-  if (up.error) throw new Error(`upload: ${up.error.message}`);
+  if (upload) {
+    const up = await db.storage
+      .from("courses")
+      .upload(storage_path, html, { contentType: "text/html; charset=utf-8", upsert: true });
+    if (up.error) throw new Error(`upload: ${up.error.message}`);
+  }
 
+  const retrain = ctx.retrain[slug];
   const { data: course, error } = await db
     .from("courses")
     .upsert(
@@ -154,15 +199,32 @@ async function syncCourse(db, slug, bySlug) {
         minutes,
         series: "lottie",
         storage_path,
+        version,
         // New courses go live; existing ones keep the owner portal's Live/Hidden switch.
-        ...(bySlug.has(slug) ? {} : { is_published: true }),
-        updated_at: new Date().toISOString(),
+        ...(prev ? {} : { is_published: true }),
+        // New courses start with the catalog's retraining rule; after that the owner portal decides.
+        ...(!prev && ctx.hasVersions && retrain ? { default_recurrence_months: retrain.months, recurrence_note: retrain.note ?? null } : {}),
+        ...(upload ? { updated_at: new Date().toISOString() } : {}),
       },
       { onConflict: "slug" },
     )
     .select("id")
     .single();
   if (error) throw new Error(`course row: ${error.message}`);
+
+  if (ctx.hasVersions && upload) {
+    const v = await db.from("course_versions").upsert(
+      {
+        course_id: course.id,
+        version,
+        storage_path,
+        content_hash: hash,
+        ...(newVersion ? { notes: ctx.notes[slug] ?? null, published_at: new Date().toISOString() } : {}),
+      },
+      { onConflict: "course_id,version" },
+    );
+    if (v.error) console.warn(`[courses] ${slug}: version record: ${v.error.message}`);
+  }
 
   const badge = await db.from("badges").upsert(
     {
@@ -174,6 +236,19 @@ async function syncCourse(db, slug, bySlug) {
     { onConflict: "slug" },
   );
   if (badge.error) throw new Error(`badge: ${badge.error.message}`);
+}
+
+/** True once someone outside the demo team has finished this version. */
+async function finishedByRealLearners(db, ctx, courseId, version) {
+  let q = db
+    .from("completions")
+    .select("id", { count: "exact", head: true })
+    .eq("course_id", courseId)
+    .eq("course_version", version);
+  if (ctx.demoOrgId) q = q.neq("org_id", ctx.demoOrgId);
+  const { count, error } = await q;
+  if (error) throw new Error(`completions check: ${error.message}`);
+  return (count ?? 0) > 0;
 }
 
 main().catch((e) => console.error(`[courses] stopped: ${e.message}`));

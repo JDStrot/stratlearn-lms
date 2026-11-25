@@ -19,6 +19,7 @@ import {
   type LoginSettings,
   type Staff,
 } from "@/lib/staff";
+import { appliesTo, type AssignmentRow } from "@/lib/status";
 
 export type FormState = { error?: string; ok?: string };
 
@@ -288,7 +289,13 @@ export async function assignTraining(_p: FormState, f: FormData): Promise<FormSt
   const db = supabaseAdmin();
   const what = str(f, "what"); // "course:<id>" or "pack:<id>:<path|*>"
   const who = str(f, "who"); // "all", "role:<id>", "location:<id>", "person:<id>"
-  const repeat = Number(str(f, "repeat")) || null;
+  // "" = follow the team or course rule, "never" = no retraining, a number = months.
+  const repeatRaw = str(f, "repeat");
+  const repeatCustom = repeatRaw !== "";
+  const repeat = repeatRaw === "never" ? null : Math.min(Number(repeatRaw) || 0, 240) || null;
+  if (repeatRaw && repeatRaw !== "never" && !repeat) return { error: "Pick how often it repeats." };
+  // "Have them take it again": finishes from before now don't count.
+  const retake = str(f, "retake") === "on";
   const dueDays = str(f, "dueDays");
   const dueDate = str(f, "dueDate");
 
@@ -338,11 +345,34 @@ export async function assignTraining(_p: FormState, f: FormData): Promise<FormSt
   }
   if (!courseIds.length) return { error: "Choose a course or a pack." };
 
-  // Skip courses this exact group already has, so assigning twice is harmless.
-  let existingQ = db.from("assignments").select("course_id").eq("org_id", s.org.id).in("course_id", courseIds);
-  for (const [k, v] of Object.entries(target)) existingQ = v ? existingQ.eq(k, v) : existingQ.is(k, null);
-  const { data: existing } = await existingQ;
-  const have = new Set((existing ?? []).map((r) => r.course_id));
+  // Who this reaches, to tell the manager how many already had it.
+  let peopleQ = db.from("learners").select("id, job_role_id, location_id").eq("org_id", s.org.id).eq("is_active", true);
+  if (target.learner_id) peopleQ = peopleQ.eq("id", target.learner_id);
+  if (target.job_role_id) peopleQ = peopleQ.eq("job_role_id", target.job_role_id);
+  if (target.location_id) peopleQ = peopleQ.eq("location_id", target.location_id);
+  const [{ data: people }, { data: allExisting }, { data: finished }] = await Promise.all([
+    peopleQ,
+    db.from("assignments").select("*").eq("org_id", s.org.id).in("course_id", courseIds),
+    db.from("completions").select("learner_id, course_id").eq("org_id", s.org.id).in("course_id", courseIds),
+  ]);
+  const reach = people ?? [];
+  const existing = (allExisting ?? []) as AssignmentRow[];
+  const done = new Set((finished ?? []).map((c) => `${c.learner_id}|${c.course_id}`));
+  let alreadyHad = 0;
+  let alreadyDone = 0;
+  for (const p of reach) {
+    const had = courseIds.some((cid) => existing.some((a) => a.course_id === cid && appliesTo(a, p)));
+    if (had) alreadyHad++;
+    if (courseIds.some((cid) => done.has(`${p.id}|${cid}`))) alreadyDone++;
+  }
+
+  // The same group already has this course: don't add it twice. With
+  // "take it again" (or a new due date / repeat) update that assignment instead.
+  const sameGroup = (a: AssignmentRow) =>
+    a.learner_id === target.learner_id && a.job_role_id === target.job_role_id && a.location_id === target.location_id;
+  const have = new Map(existing.filter(sameGroup).map((a) => [a.course_id, a.id]));
+  const now = new Date().toISOString();
+  const repeatCols = repeatCustom ? { recurrence_months: repeat, recurrence_custom: true } : {};
   const rows = courseIds
     .filter((id) => !have.has(id))
     .map((course_id) => ({
@@ -350,23 +380,60 @@ export async function assignTraining(_p: FormState, f: FormData): Promise<FormSt
       course_id,
       ...target,
       due_at,
-      recurrence_months: repeat,
+      recurrence_months: repeatCustom ? repeat : null,
+      ...(repeatCustom ? { recurrence_custom: true } : {}),
+      ...(retake ? { retake_after: now } : {}),
       pack_id,
       pack_path,
       assigned_by: s.userId,
     }));
   if (rows.length) {
     const { error } = await db.from("assignments").insert(rows);
-    if (error) return { error: error.message };
+    if (error) return { error: friendlyDbError(error.message) };
   }
-  await logEvent(s, "assign", { what, who, due_at, repeat, added: rows.length });
+  const updateIds = [...have.values()];
+  if (updateIds.length && (retake || repeatCustom)) {
+    const { error } = await db
+      .from("assignments")
+      .update({ ...(retake ? { retake_after: now, due_at } : {}), ...repeatCols })
+      .in("id", updateIds);
+    if (error) return { error: friendlyDbError(error.message) };
+  }
+  await logEvent(s, retake ? "assign.retake" : "assign", {
+    what,
+    who,
+    due_at,
+    repeat: repeatCustom ? (repeat ?? "never") : "course rule",
+    added: rows.length,
+    people: reach.length,
+    already_had: alreadyHad,
+  });
   revalidatePath("/admin", "layout");
-  const skipped = courseIds.length - rows.length;
+
+  const n = reach.length;
+  const ppl = (k: number) => `${k} ${k === 1 ? "person" : "people"}`;
+  const courses = courseIds.length === 1 ? "it" : "these";
+  if (retake)
+    return {
+      ok:
+        `Assigned to ${ppl(n)}. Everyone has to take ${courses} again, even if they finished before.` +
+        (alreadyDone ? ` Old records and certificates for ${ppl(alreadyDone)} stay on file.` : ""),
+    };
+  if (n && alreadyHad === n && !rows.length)
+    return { ok: `Already assigned: ${n === 1 ? "this person already has" : `all ${ppl(n)} already have`} ${courses}. Nothing changed. To make someone redo it, tick "Have them take it again".` };
   return {
     ok:
-      `Assigned ${rows.length} ${rows.length === 1 ? "course" : "courses"}.` +
-      (skipped ? ` ${skipped} ${skipped === 1 ? "was" : "were"} already assigned to them.` : ""),
+      `Assigned to ${ppl(n)}.` +
+      (alreadyHad ? ` ${alreadyHad} already had ${courses}, so nothing was doubled.` : "") +
+      (alreadyDone ? ` ${alreadyDone} finished it before, and that still counts until any retraining date. Tick "Have them take it again" to make them redo it now.` : ""),
   };
+}
+
+/** Plain words when the retraining database update hasn't been run yet. */
+function friendlyDbError(msg: string) {
+  return /recurrence_custom|retake_after/.test(msg)
+    ? "This option needs the retraining database update. Ask STRATLEARN to run it."
+    : msg;
 }
 
 /** Removes one assignment, or every course of a pack assignment (same group). */
@@ -556,4 +623,67 @@ export async function startTablet() {
   await logEvent(s, "tablet.setup");
   await supabaseServer().then((sb) => sb.auth.signOut({ scope: "local" }));
   redirect("/tablet");
+}
+
+// ---------------------------------------------------------------------------
+// Due dates and retraining (team settings)
+// ---------------------------------------------------------------------------
+
+const dbUpdateMissing = (msg: string) =>
+  /training_settings|org_course_settings|does not exist|schema cache/.test(msg)
+    ? "These settings need the retraining database update. Ask STRATLEARN to run it."
+    : msg;
+
+/** Default due days, grace days before overdue, and how early retraining shows up. */
+export async function saveTrainingTiming(_p: FormState, f: FormData): Promise<FormState> {
+  const s = await requireStaff();
+  if (!canManageTeam(s)) return { error: "Only owners and admins can change this." };
+  const days = (k: string, max: number) => {
+    const v = str(f, k);
+    if (v === "") return null;
+    const n = Math.round(Number(v));
+    return Number.isFinite(n) && n >= 0 && n <= max ? n : NaN;
+  };
+  const due = str(f, "dueDays") === "none" ? null : days("dueDays", 365);
+  const grace = days("graceDays", 90) ?? 0;
+  const notice = days("noticeDays", 180) ?? 30;
+  if ([due, grace, notice].some((v) => Number.isNaN(v))) return { error: "Use whole numbers of days." };
+  const training_settings = { default_due_days: due, grace_days: grace, retrain_notice_days: notice };
+  const { error } = await supabaseAdmin().from("organizations").update({ training_settings }).eq("id", s.org.id);
+  if (error) return { error: dbUpdateMissing(error.message) };
+  await logEvent(s, "settings.training", training_settings);
+  revalidatePath("/admin", "layout");
+  return { ok: "Saved." };
+}
+
+/**
+ * This team's retraining rule for one course.
+ * "" = follow the course default, "never" = no retraining, number = months.
+ */
+export async function saveCourseRule(_p: FormState, f: FormData): Promise<FormState> {
+  const s = await requireStaff();
+  if (!canManageTeam(s)) return { error: "Only owners and admins can change this." };
+  const db = supabaseAdmin();
+  const course_id = str(f, "courseId");
+  const value = str(f, "repeat");
+  const { data: course } = await db.from("courses").select("id, title").eq("id", course_id).maybeSingle();
+  if (!course) return { error: "Course not found." };
+  let error;
+  if (value === "") {
+    ({ error } = await db.from("org_course_settings").delete().eq("org_id", s.org.id).eq("course_id", course_id));
+  } else {
+    const months = value === "never" ? null : Math.round(Number(value));
+    if (months !== null && !(months >= 1 && months <= 240)) return { error: "Pick 1 to 240 months." };
+    ({ error } = await db.from("org_course_settings").upsert({
+      org_id: s.org.id,
+      course_id,
+      recurrence_months: months,
+      updated_by: s.userId,
+      updated_at: new Date().toISOString(),
+    }));
+  }
+  if (error) return { error: dbUpdateMissing(error.message) };
+  await logEvent(s, "settings.retraining", { course: course.title, repeat: value || "course default" });
+  revalidatePath("/admin", "layout");
+  return { ok: "Saved." };
 }

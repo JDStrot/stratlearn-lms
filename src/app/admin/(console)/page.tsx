@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireStaff } from "@/lib/staff";
-import { isLate } from "@/lib/status";
+import { isCurrent, isLate } from "@/lib/status";
 import { fmtDate, loadTeam, nameOf, teamStatus } from "../data";
 import { PageHead, Stat, StatusChip } from "../ui";
 
@@ -18,10 +18,10 @@ export default async function Overview() {
   for (const { person, statuses } of rows) {
     for (const st of statuses) {
       assigned++;
-      if (st.status === "done") done++;
+      if (isCurrent(st.status)) done++;
       if (isLate(st.status))
         late.push({ personId: person.id, name: person.display_name, course: courseTitle.get(st.courseId) ?? "", status: st.status as "overdue", dueAt: st.dueAt });
-      else if (st.status === "due" && st.dueAt && new Date(st.dueAt).getTime() < weekAhead)
+      else if ((st.status === "due" || st.status === "renew") && st.dueAt && new Date(st.dueAt).getTime() < weekAhead)
         soon.push({ personId: person.id, name: person.display_name, course: courseTitle.get(st.courseId) ?? "", status: "overdue", dueAt: st.dueAt });
     }
   }

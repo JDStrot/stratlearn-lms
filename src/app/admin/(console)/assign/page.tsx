@@ -2,9 +2,9 @@ import { requireStaff } from "@/lib/staff";
 import { removeAssignment } from "../../actions";
 import { fmtDate, loadPacks, loadTeam, nameOf } from "../../data";
 import { PageHead } from "../../ui";
+import { repeatLabel } from "@/lib/status";
 import { AssignForm } from "./assign-form";
 
-const REPEAT: Record<number, string> = { 12: "every year", 24: "every 2 years", 36: "every 3 years", 6: "every 6 months", 1: "every month" };
 
 export default async function AssignPage({ searchParams }: { searchParams: Promise<{ who?: string }> }) {
   const { who } = await searchParams;
@@ -22,11 +22,13 @@ export default async function AssignPage({ searchParams }: { searchParams: Promi
   };
 
   // Group pack assignments so a 12-course pack shows as one line.
-  type Group = { key: string; title: string; sub: string; who: string; due: string | null; repeat: number | null; ids: string[] };
+  type Group = { key: string; title: string; sub: string; who: string; due: string | null; repeat: string; ids: string[] };
+  // Real clock per assignment (team and course rules filled in).
+  const effective = new Map(team.assignments.map((a) => [a.id, a.recurrence_months]));
   const groups = new Map<string, Group>();
-  for (const a of team.assignments) {
+  for (const a of team.rawAssignments) {
     const target = `${a.learner_id}|${a.job_role_id}|${a.location_id}`;
-    const key = a.pack_id ? `p|${a.pack_id}|${a.pack_path}|${target}|${a.due_at}|${a.recurrence_months}` : `c|${a.id}`;
+    const key = a.pack_id ? `p|${a.pack_id}|${a.pack_path}|${target}|${a.due_at}|${a.recurrence_custom}|${a.recurrence_months}` : `c|${a.id}`;
     const g = groups.get(key);
     if (g) {
       g.ids.push(a.id);
@@ -38,7 +40,12 @@ export default async function AssignPage({ searchParams }: { searchParams: Promi
       sub: a.pack_id ? (a.pack_path ? `${a.pack_path} path` : "whole pack") : "course",
       who: whoLabel(a),
       due: a.due_at,
-      repeat: a.recurrence_months,
+      repeat:
+        a.recurrence_custom === false
+          ? a.pack_id
+            ? "Course rules"
+            : `${repeatLabel(effective.get(a.id))} (course rule)`
+          : repeatLabel(a.recurrence_months),
       ids: [a.id],
     });
   }
@@ -54,6 +61,7 @@ export default async function AssignPage({ searchParams }: { searchParams: Promi
         roles={team.roles}
         locations={team.locations}
         people={team.people.filter((p) => p.is_active).map((p) => ({ id: p.id, name: p.display_name }))}
+        defaultDueDays={team.rules.settings.default_due_days}
       />
 
       <section className="card mt-8 overflow-x-auto">
@@ -64,7 +72,7 @@ export default async function AssignPage({ searchParams }: { searchParams: Promi
               <th className="px-6 py-3 font-semibold">Training</th>
               <th className="px-4 py-3 font-semibold">Who</th>
               <th className="px-4 py-3 font-semibold">Due</th>
-              <th className="px-4 py-3 font-semibold">Repeats</th>
+              <th className="px-4 py-3 font-semibold">Retraining</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
@@ -82,7 +90,7 @@ export default async function AssignPage({ searchParams }: { searchParams: Promi
                 </td>
                 <td className="px-4 py-3">{g.who}</td>
                 <td className="px-4 py-3">{g.due ? fmtDate(g.due) : <span className="text-muted">No date</span>}</td>
-                <td className="px-4 py-3">{g.repeat ? REPEAT[g.repeat] ?? `every ${g.repeat} months` : <span className="text-muted">Once</span>}</td>
+                <td className="px-4 py-3">{g.repeat}</td>
                 <td className="px-4 py-3 text-right">
                   <form action={removeAssignment}>
                     <input type="hidden" name="ids" value={g.ids.join(",")} />
