@@ -350,3 +350,236 @@ a {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Dashboards (charts in src/app/admin/charts.tsx) */
+:root {
+  --viz-done: #1d7a46;
+  --viz-renew: #d4a017;
+  --viz-due: #c5a8f5;
+  --viz-late: #b3261e;
+  --viz-expired: #7a1a14;
+  --viz-es: #1f8a8a;
+}
+.viz-key {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.viz-split {
+  display: flex;
+  gap: 2px;
+  height: 18px;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.viz-split-sm {
+  height: 10px;
+  border-radius: 999px;
+}
+.viz-track {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--mist);
+  overflow: hidden;
+}
+.viz-track > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--plum), var(--violet));
+}
+.viz-cols {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  height: 230px;
+  padding-bottom: 26px;
+}
+.viz-cols-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-align: right;
+  transform: translateY(-0.45em);
+  margin-bottom: -0.9em;
+}
+.viz-cols-plot {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  border-bottom: 1px solid #cfc3e6;
+}
+.viz-grid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--line);
+  pointer-events: none;
+}
+.viz-col {
+  position: relative;
+  flex: 1;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  outline: none;
+}
+.viz-col-bar {
+  position: relative;
+  width: min(24px, 70%);
+  border-radius: 4px 4px 0 0;
+  transition: filter 0.15s;
+}
+.viz-col:hover .viz-col-bar,
+.viz-col:focus-visible .viz-col-bar {
+  filter: brightness(1.35);
+}
+.viz-col-val {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translate(-50%, -4px);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.viz-col-label {
+  position: absolute;
+  top: 100%;
+  margin-top: 6px;
+  font-size: 0.72rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.viz-tip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  min-width: max-content;
+  padding: 0.45rem 0.7rem;
+  border-radius: 10px;
+  background: var(--plum-deep);
+  color: #fff;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.viz-col .viz-tip {
+  bottom: auto;
+  top: 0;
+  transform: translate(-50%, -110%);
+}
+.viz-col:hover .viz-tip,
+.viz-col:focus-visible .viz-tip,
+.viz-dot:hover .viz-tip,
+.viz-dot:focus-visible .viz-tip {
+  opacity: 1;
+}
+.viz-dot {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  transform: translate(-50%, 50%);
+  outline: none;
+}
+.viz-dot::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-radius: 999px;
+  background: var(--violet);
+  box-shadow: 0 0 0 2px #fff;
+}
+.viz-dot:hover::after,
+.viz-dot:focus-visible::after {
+  inset: 3px;
+}
+.viz-dot-val {
+  position: absolute;
+  right: 100%;
+  bottom: 100%;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.viz-xlabels span {
+  position: absolute;
+  top: 100%;
+  margin-top: 6px;
+  transform: translateX(-50%);
+  font-size: 0.72rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.viz-hit {
+  transition: stroke-width 0.15s;
+}
+.viz-hit:hover {
+  stroke-width: 14;
+}
+.viz-heat {
+  border-collapse: separate;
+  border-spacing: 3px;
+}
+.viz-heat th,
+.viz-heat td {
+  padding: 0;
+}
+.viz-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 56px;
+  height: 34px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.viz-cell-none {
+  background: transparent;
+  border: 1px dashed var(--line);
+  color: var(--muted);
+  font-weight: 400;
+}
+.print-only {
+  display: none;
+}
+
+@media print {
+  .print-only {
+    display: block;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .viz-panel {
+    break-inside: avoid;
+    box-shadow: none;
+  }
+  .viz-split > span,
+  .viz-track > span,
+  .viz-col-bar,
+  .viz-cell,
+  .viz-key,
+  .viz-dot::after {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .viz-tip {
+    display: none;
+  }
+}

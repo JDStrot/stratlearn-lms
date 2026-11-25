@@ -14,6 +14,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
   return (
     <>
       <PageHead eyebrow="✦ Reports" title={<>Who&apos;s <em>done</em></>}>
+        <Link href="/admin/dashboards" className="btn btn-ghost btn-sm">See dashboards</Link>
         <a href={`/admin/reports/export?type=status&${qs}`} className="btn btn-primary btn-sm">Download this view (CSV)</a>
       </PageHead>
 
