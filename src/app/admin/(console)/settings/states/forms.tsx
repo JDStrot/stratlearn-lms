@@ -3,8 +3,9 @@
 import { useActionState } from "react";
 import { assignTraining, saveLocationPlace, type FormState } from "../../../actions";
 import { US_STATES } from "@/lib/state-rules";
+import { STATE_TZ, TIME_ZONES, tzName } from "@/lib/time-zones";
 
-export function PlaceForm({ id, state, city, disabled }: { id: string; state: string | null; city: string | null; disabled: boolean }) {
+export function PlaceForm({ id, state, city, timeZone, disabled }: { id: string; state: string | null; city: string | null; timeZone: string | null; disabled: boolean }) {
   const [s, action, pending] = useActionState<FormState, FormData>(saveLocationPlace, {});
   return (
     <form action={action} className="flex flex-wrap items-end gap-2">
@@ -19,6 +20,13 @@ export function PlaceForm({ id, state, city, disabled }: { id: string; state: st
       <label className="flex flex-col gap-1">
         <span className="label text-plum">City</span>
         <input name="city" defaultValue={city ?? ""} disabled={disabled} placeholder="e.g. New York" className="field !min-h-[40px] w-40 !py-1.5" />
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className="label text-plum">Time zone</span>
+        <select name="timeZone" defaultValue={timeZone ?? ""} disabled={disabled} className="field !min-h-[40px] !py-1.5">
+          <option value="">{state && STATE_TZ[state] ? `Auto (${tzName(STATE_TZ[state])})` : "Auto (team zone)"}</option>
+          {TIME_ZONES.map(([tz, name]) => <option key={tz} value={tz}>{name}</option>)}
+        </select>
       </label>
       {!disabled && <button disabled={pending} className="btn btn-ghost btn-sm">Save</button>}
       {s.error ? <span className="text-sm text-error">{s.error}</span> : s.ok ? <span className="text-sm text-success">✓</span> : null}

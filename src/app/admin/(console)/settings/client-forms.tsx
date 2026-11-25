@@ -46,7 +46,7 @@ export function RecordsForm({ v, disabled }: { v: RecordsSettings; disabled: boo
   return (
     <form action={action} className="grid gap-4">
       <fieldset disabled={disabled} className="grid gap-4 md:grid-cols-2">
-        <Field label="Team time zone" hint="Dates and times in the console, CSV files and emailed reports use this">
+        <Field label="Team time zone" hint="For the console, CSV files and emailed reports. Each location uses its state's zone unless you change it in State rules">
           <select name="timeZone" defaultValue={v.time_zone} className="field">
             {TIME_ZONES.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
             {!TIME_ZONES.some(([id]) => id === v.time_zone) && <option value={v.time_zone}>{v.time_zone}</option>}

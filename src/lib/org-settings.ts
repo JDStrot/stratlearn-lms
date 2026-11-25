@@ -1,6 +1,7 @@
 import "server-only";
 import { supabaseAdmin } from "./supabase/admin";
 import { DEFAULT_TZ, validTz } from "./time-zones";
+import { readLocationZones } from "./team-time";
 
 /** Per-client settings stored as JSON on organizations (one column per area). */
 
@@ -35,6 +36,8 @@ export type RecordsSettings = {
   last_export_at: string | null;
   /** Dates in the console and reports use this time zone. */
   time_zone: string;
+  /** Location id -> time zone picked by hand (else the location's state zone). */
+  location_time_zones: Record<string, string>;
 };
 
 const int = (v: unknown, min: number, max: number, d: number) =>
@@ -75,6 +78,7 @@ export function readRecords(raw: unknown): RecordsSettings {
     export_emails: emails,
     last_export_at: typeof r.last_export_at === "string" ? r.last_export_at : null,
     time_zone: validTz(r.time_zone) ?? DEFAULT_TZ,
+    location_time_zones: readLocationZones(r.location_time_zones),
   };
 }
 

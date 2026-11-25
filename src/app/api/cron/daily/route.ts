@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email";
 import { readNotify, readRecords } from "@/lib/org-settings";
 import { dayIn } from "@/lib/time-zones";
+import { locationZones } from "@/lib/team-time";
 import { STATUS_LABEL, isLate, type Status } from "@/lib/status";
 import { loadTeam, teamStatus } from "@/app/admin/data";
 import { statusRows, toCsv } from "@/app/admin/(console)/reports/rows";
@@ -48,7 +49,9 @@ async function runOrg(org: Org, emailOf: Map<string, string>) {
   const notify = readNotify(org.notify_settings);
   // Dates in emails and the CSV use the team's time zone.
   const records = readRecords(org.records_settings);
-  const day = (iso: string | null | undefined) => dayIn(iso, records.time_zone);
+  // Each person's dates in their location's time zone (else the team's).
+  const { zoneOf } = await locationZones(org.id);
+  const day = (iso: string | null | undefined, loc?: string | null) => dayIn(iso, zoneOf(loc));
   const now = Date.now();
   const team = await loadTeam(org.id);
   const title = new Map(team.courses.map((c) => [c.id, c.title]));
@@ -77,7 +80,7 @@ async function runOrg(org: Org, emailOf: Map<string, string>) {
       });
       if (!items.length) continue;
       const es = person.preferred_language === "es";
-      const lines = items.map((st) => `• ${title.get(st.courseId) ?? "Course"} (${es ? "vence" : "due"} ${day(st.dueAt)})`);
+      const lines = items.map((st) => `• ${title.get(st.courseId) ?? "Course"} (${es ? "vence" : "due"} ${day(st.dueAt, person.location_id)})`);
       const status = await sendEmail({
         to: [person.email],
         subject: es ? `Tienes capacitación pendiente en ${org.name}` : `Training due at ${org.name}`,
@@ -117,7 +120,7 @@ async function runOrg(org: Org, emailOf: Map<string, string>) {
           subject: `${mine.length} overdue training ${mine.length === 1 ? "item" : "items"} at ${org.name}`,
           text:
             `These are more than ${notify.escalate_after_days} days overdue:\n\n` +
-            mine.map((l) => `• ${l.name}: ${title.get(l.courseId) ?? "Course"} (${STATUS_LABEL[l.status]}, due ${day(l.dueAt)})`).join("\n") +
+            mine.map((l) => `• ${l.name}: ${title.get(l.courseId) ?? "Course"} (${STATUS_LABEL[l.status]}, due ${day(l.dueAt, l.locationId)})`).join("\n") +
             `\n\nSee who's behind: ${SITE}/admin/reports?status=late`,
         });
         log.push({ org_id: org.id, kind: "escalation_digest", sent_to: email, status });
@@ -139,7 +142,7 @@ async function runOrg(org: Org, emailOf: Map<string, string>) {
     const { rows } = await statusRows(org.id, {});
     const csv = toCsv(
       ["Name", "Sign-in name", "Employee ID", "Role", "Location", "Course", "Status", "Due / retrain by", "Last finished", "Version", "Score"],
-      rows.map((r) => [r.name, r.username, r.employeeId, r.role, r.location, r.course, STATUS_LABEL[r.status], day(r.dueAt), day(r.completedAt ?? r.lastFinishedAt), r.version, r.score]),
+      rows.map((r) => [r.name, r.username, r.employeeId, r.role, r.location, r.course, STATUS_LABEL[r.status], day(r.dueAt, r.locationId), day(r.completedAt ?? r.lastFinishedAt, r.locationId), r.version, r.score]),
     );
     const late = rows.filter((r) => isLate(r.status)).length;
     const status = await sendEmail({

@@ -50,3 +50,20 @@ export function tzShort(tz: string) {
       .find((p) => p.type === "timeZoneName")?.value ?? tz
   );
 }
+
+// Main time zone for each state, used when a location has a state but no time
+// zone of its own. States split across zones use the zone most people live in;
+// a location can pick another zone on the State rules page.
+const E = "America/New_York", C = "America/Chicago", M = "America/Denver", P = "America/Los_Angeles";
+export const STATE_TZ: Record<string, string> = {
+  AL: C, AK: "America/Anchorage", AZ: "America/Phoenix", AR: C, CA: P, CO: M, CT: E, DE: E, DC: E, FL: E,
+  GA: E, HI: "Pacific/Honolulu", ID: M, IL: C, IN: E, IA: C, KS: C, KY: E, LA: C, ME: E, MD: E, MA: E,
+  MI: E, MN: C, MS: C, MO: C, MT: M, NE: C, NV: P, NH: E, NJ: E, NM: M, NY: E, NC: E, ND: C, OH: E,
+  OK: C, OR: P, PA: E, RI: E, SC: E, SD: C, TN: C, TX: C, UT: M, VT: E, VA: E, WA: P, WV: E, WI: C,
+  WY: M, PR: "America/Puerto_Rico",
+};
+
+/** Name from TIME_ZONES, e.g. "Pacific". */
+export function tzName(tz: string) {
+  return TIME_ZONES.find(([id]) => id === tz)?.[1] ?? tz;
+}
