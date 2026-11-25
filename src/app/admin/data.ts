@@ -1,5 +1,6 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { teamTz } from "@/lib/team-time";
 import { loadRetrainRules } from "@/lib/retrain";
 import {
   applyRetrainRules,
@@ -117,7 +118,8 @@ export async function loadPacks(orgId: string): Promise<PackLite[]> {
 export const nameOf = (list: Named[], id: string | null) =>
   (id && list.find((x) => x.id === id)?.name) || "";
 
-export function fmtDate(iso: string | null | undefined) {
+/** "Nov 24, 2026" in the team's time zone (see lib/team-time.ts). */
+export function fmtDate(iso: string | null | undefined, tz = teamTz()) {
   if (!iso) return "";
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: tz });
 }

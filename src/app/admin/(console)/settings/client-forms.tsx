@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import type { FormState } from "../../actions";
 import { saveCertificate, saveNotify, saveQuiz, saveRecords, uploadDocument } from "../../settings-actions";
 import type { CertificateSettings, NotifySettings, QuizSettings, RecordsSettings } from "@/lib/org-settings";
+import { TIME_ZONES } from "@/lib/time-zones";
 import { Field, Notice } from "../../ui";
 
 function useForm(fn: (p: FormState, f: FormData) => Promise<FormState>) {
@@ -45,6 +46,12 @@ export function RecordsForm({ v, disabled }: { v: RecordsSettings; disabled: boo
   return (
     <form action={action} className="grid gap-4">
       <fieldset disabled={disabled} className="grid gap-4 md:grid-cols-2">
+        <Field label="Team time zone" hint="Dates and times in the console, CSV files and emailed reports use this">
+          <select name="timeZone" defaultValue={v.time_zone} className="field">
+            {TIME_ZONES.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+            {!TIME_ZONES.some(([id]) => id === v.time_zone) && <option value={v.time_zone}>{v.time_zone}</option>}
+          </select>
+        </Field>
         <Field label="Keep training records for" hint="OSHA asks for 3 years on some topics; many lawyers suggest 5 or more">
           <select name="retention" defaultValue={v.retention_years == null ? "forever" : String(v.retention_years)} className="field">
             {[3, 5, 7, 10].map((y) => <option key={y} value={y}>At least {y} years</option>)}
