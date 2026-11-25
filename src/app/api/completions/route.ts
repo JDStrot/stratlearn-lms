@@ -3,6 +3,8 @@ import { readSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { assignedCourses } from "@/lib/learner";
 import { addMonths } from "@/lib/status";
+import { attemptState, roundStartOf } from "@/lib/attempts";
+import { loadOrgSettings } from "@/lib/org-settings";
 import type { Learner } from "@/lib/learner";
 
 /**
@@ -21,7 +23,7 @@ export async function POST(req: NextRequest) {
   const db = supabaseAdmin();
   const { data: learner } = await db
     .from("learners")
-    .select("id, org_id, display_name, preferred_language, job_role_id, location_id")
+    .select("id, org_id, display_name, preferred_language, job_role_id, location_id, start_date, created_at")
     .eq("id", session.lid)
     .eq("is_active", true)
     .maybeSingle();
@@ -36,6 +38,26 @@ export async function POST(req: NextRequest) {
       ? Math.round(body.score)
       : null;
   const language = body.lang === "es" ? "es" : "en";
+
+  // Team passing score and tries. A score under the bar is a failed try, not a finish.
+  const { quiz } = await loadOrgSettings(learner.org_id);
+  if (quiz.pass_score != null || quiz.max_attempts != null) {
+    const start = roundStartOf(item.lastFinishedAt, item.retakeAfter, item.completedAt);
+    const before = await attemptState(learner.id, course.id, start, quiz);
+    if (before.locked) return NextResponse.json({ ok: false, locked: true, need: quiz.pass_score });
+    if (quiz.pass_score != null && score != null && score < quiz.pass_score) {
+      await db.from("course_attempts").insert({
+        org_id: learner.org_id,
+        learner_id: learner.id,
+        course_id: course.id,
+        course_version: course.version,
+        kind: "attempt",
+        score,
+      });
+      const triesLeft = before.triesLeft == null ? null : before.triesLeft - 1;
+      return NextResponse.json({ ok: false, score, need: quiz.pass_score, triesLeft, locked: triesLeft === 0 });
+    }
+  }
 
   const { data: completion, error } = await db
     .from("completions")

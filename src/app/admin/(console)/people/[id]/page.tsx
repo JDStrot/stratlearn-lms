@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireStaff } from "@/lib/staff";
-import { STATUS_ORDER, learnerStatuses, repeatLabel } from "@/lib/status";
+import { STATUS_ORDER, isToDo, learnerStatuses, repeatLabel } from "@/lib/status";
+import { loadOrgSettings } from "@/lib/org-settings";
+import { roundStartOf } from "@/lib/attempts";
+import { resetAttempts } from "../../../settings-actions";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { newBadge, removeAssignment, setActive, unlockPerson } from "../../../actions";
 import { fmtDate, loadTeam, nameOf } from "../../../data";
@@ -11,7 +14,7 @@ import { EditPerson, EmailSignIn, ResetPin } from "./forms";
 export default async function PersonPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const s = await requireStaff();
-  const team = await loadTeam(s.org.id);
+  const team = await loadTeam(s.org.id, s.locationIds);
   const p = team.people.find((x) => x.id === id);
   if (!p) notFound();
 
@@ -19,6 +22,18 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
   const course = new Map(team.courses.map((c) => [c.id, c]));
   statuses.sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]);
   const direct = team.assignments.filter((a) => a.learner_id === p.id);
+
+  // Failed quiz tries this round, to show "locked" and a "Give more tries" button.
+  const [{ quiz }, { data: tries }] = await Promise.all([
+    loadOrgSettings(s.org.id),
+    supabaseAdmin().from("course_attempts").select("course_id, kind, created_at").eq("learner_id", p.id).order("created_at", { ascending: false }),
+  ]);
+  const failuresFor = (courseId: string, start: string | null) => {
+    const rows = (tries ?? []).filter((t) => t.course_id === courseId);
+    const reset = rows.find((t) => t.kind === "reset")?.created_at ?? null;
+    const since = [start, reset].filter(Boolean).sort().pop() ?? null;
+    return rows.filter((t) => t.kind === "attempt" && (!since || t.created_at > since)).length;
+  };
 
   const { data: certs } = await supabaseAdmin()
     .from("certificates")
@@ -55,6 +70,8 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
             <ul className="divide-y divide-line">
               {statuses.map((st) => {
                 const c = course.get(st.courseId);
+                const fails = isToDo(st.status) ? failuresFor(st.courseId, roundStartOf(st.lastFinishedAt, st.retakeAfter, null)) : 0;
+                const locked = quiz.max_attempts != null && fails >= quiz.max_attempts;
                 return (
                   <li key={st.courseId} className="flex flex-wrap items-center justify-between gap-3 py-3">
                     <span>
@@ -65,10 +82,18 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
                         {st.completedAt && st.recurrenceMonths ? ` · retrain by ${fmtDate(st.dueAt)}` : ""}
                         {st.recurrenceMonths ? ` · repeats ${repeatLabel(st.recurrenceMonths).toLowerCase()}` : ""}
                         {!st.completedAt && st.lastFinishedAt ? ` · last finished ${fmtDate(st.lastFinishedAt)}` : ""}
+                        {fails ? ` · ${fails} failed ${fails === 1 ? "try" : "tries"}` : ""}
                         {st.score != null ? ` · score ${st.score}%` : ""}
                       </span>
                     </span>
                     <span className="flex items-center gap-2">
+                      {locked && (
+                        <form action={resetAttempts}>
+                          <input type="hidden" name="learnerId" value={p.id} />
+                          <input type="hidden" name="courseId" value={st.courseId} />
+                          <button className="btn btn-primary btn-sm">Give more tries</button>
+                        </form>
+                      )}
                       {cert.get(st.courseId) && (
                         <Link href={`/verify/${cert.get(st.courseId)}`} className="chip no-underline">Certificate</Link>
                       )}

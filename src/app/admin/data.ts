@@ -23,6 +23,7 @@ export type Person = {
   locked_until: string | null;
   last_login_at: string | null;
   created_at: string;
+  start_date: string | null;
 };
 
 export type Named = { id: string; name: string };
@@ -35,10 +36,10 @@ export type PackLite = {
 };
 
 const PERSON_COLS =
-  "id, display_name, username, email, phone, employee_id, preferred_language, job_role_id, location_id, is_active, locked_until, last_login_at, created_at";
+  "id, display_name, username, email, phone, employee_id, preferred_language, job_role_id, location_id, is_active, locked_until, last_login_at, created_at, start_date";
 
 /** Everything the console needs about one team, in one round of queries. */
-export async function loadTeam(orgId: string) {
+export async function loadTeam(orgId: string, locationIds: string[] | null = null) {
   const db = supabaseAdmin();
   const [people, roles, locations, assignments, completions, courses, rules] = await Promise.all([
     db.from("learners").select(PERSON_COLS).eq("org_id", orgId).order("display_name"),
@@ -59,17 +60,22 @@ export async function loadTeam(orgId: string) {
     loadRetrainRules(orgId),
   ]);
   type A = AssignmentRow & { pack_path: string | null };
+  // Managers limited to some locations only see those people and places.
+  const scoped = <T,>(list: T[], loc: (x: T) => string | null) =>
+    locationIds ? list.filter((x) => { const l = loc(x); return !!l && locationIds.includes(l); }) : list;
+  const peopleList = scoped((people.data ?? []) as Person[], (p) => p.location_id);
+  const visible = new Set(peopleList.map((p) => p.id));
   const raw = (assignments.data ?? []) as A[];
   return {
-    people: (people.data ?? []) as Person[],
+    people: peopleList,
     roles: (roles.data ?? []) as Named[],
-    locations: (locations.data ?? []) as Named[],
+    locations: scoped((locations.data ?? []) as Named[], (l) => l.id),
     /** As the managers set them (repeat = only what they picked). */
     rawAssignments: raw,
     /** With the real retraining clock filled in from team and course rules. */
     assignments: applyRetrainRules(raw, rules),
     rules,
-    completions: (completions.data ?? []) as CompletionRow[],
+    completions: ((completions.data ?? []) as CompletionRow[]).filter((c) => !locationIds || visible.has(c.learner_id)),
     courses: (courses.data ?? []) as CourseLite[],
   };
 }

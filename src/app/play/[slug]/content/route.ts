@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { assignedCourses, requireLearner } from "@/lib/learner";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { courseHook } from "@/lib/course-hook";
+import { attemptState, roundStartOf } from "@/lib/attempts";
+import { loadOrgSettings } from "@/lib/org-settings";
 
 /**
  * Serves a course's HTML file from the private "courses" storage bucket.
@@ -17,6 +19,17 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
   if (!item?.course.storage_path) return new NextResponse("Course not found", { status: 404 });
 
   const { course } = item;
+
+  // Failed tries: each try starts fresh; after the last one, wait for a manager.
+  let tries = 0;
+  if (!item.completedAt) {
+    const { quiz } = await loadOrgSettings(learner.org_id);
+    if (quiz.pass_score != null || quiz.max_attempts != null) {
+      const st = await attemptState(learner.id, course.id, roundStartOf(item.lastFinishedAt, item.retakeAfter, null), quiz);
+      if (st.locked) return lockedPage(learner.preferred_language === "es");
+      tries = st.failures;
+    }
+  }
   const { data, error } = await supabaseAdmin().storage.from("courses").download(item.course.storage_path);
   if (error || !data) {
     console.error("course download failed", course.storage_path, error);
@@ -28,7 +41,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
     slug: course.slug,
     courseVersion: course.version,
     completed: Boolean(item.completedAt),
-    round: item.completedAt ? "" : roundKey(item.lastFinishedAt, item.retakeAfter),
+    round: item.completedAt ? "" : roundKey(item.lastFinishedAt, item.retakeAfter) + (tries ? `t${tries}` : ""),
   });
   const html = hook + (await data.text());
 
@@ -45,4 +58,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
 function roundKey(lastFinishedAt: string | null, retakeAfter: string | null) {
   const t = Math.max(lastFinishedAt ? Date.parse(lastFinishedAt) : 0, retakeAfter ? Date.parse(retakeAfter) : 0);
   return t ? String(t) : "";
+}
+
+function lockedPage(es: boolean) {
+  const msg = es
+    ? "Usaste todos tus intentos. Pide a tu gerente que te dé más intentos."
+    : "You've used all your tries. Ask your manager to give you more tries.";
+  return new NextResponse(
+    `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><body style="font:18px/1.5 system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;padding:16px;background:#f6f1fa;color:#400265;text-align:center"><p>${msg}</p></body>`,
+    { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "private, no-store" } },
+  );
 }

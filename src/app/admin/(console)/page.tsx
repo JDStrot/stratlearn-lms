@@ -6,7 +6,7 @@ import { PageHead, Stat, StatusChip } from "../ui";
 
 export default async function Overview() {
   const s = await requireStaff();
-  const team = await loadTeam(s.org.id);
+  const team = await loadTeam(s.org.id, s.locationIds);
   const rows = teamStatus(team);
   const courseTitle = new Map(team.courses.map((c) => [c.id, c.title]));
 

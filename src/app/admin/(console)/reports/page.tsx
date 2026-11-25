@@ -7,7 +7,7 @@ import { statusRows, type ReportFilter } from "./rows";
 export default async function Reports({ searchParams }: { searchParams: Promise<ReportFilter> }) {
   const f = await searchParams;
   const s = await requireStaff();
-  const { team, rows } = await statusRows(s.org.id, f);
+  const { team, rows } = await statusRows(s.org.id, f, s.locationIds);
   const qs = new URLSearchParams(Object.entries(f).filter(([, v]) => v) as [string, string][]).toString();
   const shown = rows.slice(0, 500);
 
