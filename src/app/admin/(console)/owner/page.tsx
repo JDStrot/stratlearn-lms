@@ -63,6 +63,7 @@ export default async function OwnerHome() {
   return (
     <>
       <PageHead eyebrow="★ STRATLEARN owner portal" title={<>All <em>clients</em></>}>
+        <Link href="/admin/owner/dashboards" className="btn btn-primary btn-sm">Platform dashboards</Link>
         <Link href="/admin/owner/library" className="btn btn-ghost btn-sm">Course library</Link>
         <Link href="/admin/owner/certificates" className="btn btn-ghost btn-sm">Certificate lookup</Link>
       </PageHead>

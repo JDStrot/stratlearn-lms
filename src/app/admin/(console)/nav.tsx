@@ -7,6 +7,7 @@ const LINKS = [
   ["/admin", "Overview"],
   ["/admin/people", "People"],
   ["/admin/assign", "Assign training"],
+  ["/admin/dashboards", "Dashboards"],
   ["/admin/reports", "Reports"],
   ["/admin/badges", "Print badges"],
   ["/admin/settings", "Team settings"],
