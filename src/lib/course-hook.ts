@@ -18,6 +18,10 @@ import "server-only";
  *    "Try again" button (id="again") under "You got X of Y" when the final
  *    check is not passed; the script spots it and sends "stratlearn:try" with
  *    that score, so managers can see how many tries a course took.
+ * 4. Hands the end of the course to the app. The course's own pearl and
+ *    certificate page (renderBadge) is replaced: its "Get my pearl and
+ *    certificate" button sends "stratlearn:finished", and the player shows the
+ *    app's finish screen (back to My courses, certificate, share).
  */
 export function courseHook(opts: {
   learnerId: string;
@@ -54,6 +58,9 @@ if(!DONE&&window.MutationObserver){var seen=[];new MutationObserver(function(){
   if(m&&+m[2]>0)sc=Math.round(+m[1]/+m[2]*100);
   try{window.parent.postMessage({type:"stratlearn:try",score:sc,lang:window.LOTTIE_LANG||"en"},location.origin)}catch(e){}
 }).observe(document.documentElement,{childList:true,subtree:true})}
+function finished(){try{window.parent.postMessage({type:"stratlearn:finished"},location.origin)}catch(e){}}
+function takeEnd(){if(typeof window.renderBadge==="function"&&window.renderBadge!==finished){try{window.renderBadge=finished}catch(e){}}}
+document.addEventListener("DOMContentLoaded",takeEnd);window.addEventListener("load",takeEnd);
 if(!DONE){try{for(var i=0;i<ls.length;i++){var k=ls.key(i);if(k&&k.indexOf(P)===0){var o=parse(g.call(ls,k));
   if(o&&o.passed===true){var st=o;setTimeout(function(){report(st)},1500);break}}}}catch(e){}}
 })();`;

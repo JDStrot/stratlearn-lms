@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { supabaseAdmin } from "./supabase/admin";
 import { supabaseServer } from "./supabase/server";
+import { DEFAULT_TZ, validTz } from "./time-zones";
+import { setTeamTz } from "./team-time";
 
 export type LoginSettings = {
   pin: boolean;
@@ -34,6 +36,9 @@ export type Org = {
   join_code: string;
   default_language: "en" | "es";
   login_settings: LoginSettings;
+  records_settings?: { time_zone?: unknown } | null;
+  /** The team's time zone (Settings > Reminders & records). */
+  time_zone: string;
 };
 
 export type StaffRole = "owner" | "admin" | "manager";
@@ -65,7 +70,7 @@ export async function requireStaff(): Promise<Staff> {
   if (!user) redirect("/admin/login");
 
   const db = supabaseAdmin();
-  const ORG_COLS = "id, name, join_code, default_language, login_settings";
+  const ORG_COLS = "id, name, join_code, default_language, login_settings, records_settings";
   const [{ data: rows }, { data: platform }] = await Promise.all([
     db.from("staff_members").select(`org_id, role, location_ids, organizations(${ORG_COLS})`).eq("user_id", user.id),
     db.from("platform_admins").select("user_id").eq("user_id", user.id).maybeSingle(),
@@ -91,6 +96,8 @@ export async function requireStaff(): Promise<Staff> {
   const m = memberships.find((x) => x.org.id === picked) ?? memberships[0];
   const org = m.org;
   org.login_settings = { ...DEFAULT_LOGIN_SETTINGS, ...(org.login_settings ?? {}) };
+  org.time_zone = validTz(org.records_settings?.time_zone) ?? DEFAULT_TZ;
+  setTeamTz(org.time_zone);
 
   return {
     userId: user.id,

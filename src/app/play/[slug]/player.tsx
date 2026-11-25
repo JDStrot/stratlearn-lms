@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { CourseArt } from "@/app/learn/course-art";
 
 /**
  * Shows a course inside an iframe and listens for its completion message.
@@ -9,10 +11,17 @@ import { useEffect, useRef, useState } from "react";
  *   window.parent.postMessage({ type: "stratlearn:complete", score: 92, lang: "en" }, "*")
  * (score and lang are optional). Lottie courses send it through the script
  * the content route adds to each course (src/lib/course-hook.ts).
+ *
+ * When the learner taps "Get my pearl and certificate" at the end, the course
+ * sends "stratlearn:finished" instead of showing its own pearl page, and the
+ * player shows the finish screen: back to My courses, certificate, share.
  */
-export function CoursePlayer({ slug, lang }: { slug: string; lang: "en" | "es" }) {
+export function CoursePlayer({ slug, lang, title }: { slug: string; lang: "en" | "es"; title: string }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [saved, setSaved] = useState(false);
+  // Finish screen: null = hidden, then the certificate code and share token once loaded.
+  const [finish, setFinish] = useState<{ certificate: string | null; share: string | null } | "loading" | null>(null);
+  const saving = useRef<Promise<boolean> | null>(null);
   const flushTime = useRef<() => Promise<unknown>>(async () => {});
   const onFrameLoad = useRef<() => void>(() => {});
 
@@ -81,17 +90,35 @@ export function CoursePlayer({ slug, lang }: { slug: string; lang: "en" | "es" }
         });
         return;
       }
+      if (msg?.type === "stratlearn:finished") {
+        // Wait for the completion to save; a score under the team's bar shows "Try again" instead.
+        const ok = saving.current ? await saving.current : true;
+        if (!ok) return;
+        setFinish("loading");
+        const info = await fetch(`/api/completions?slug=${encodeURIComponent(slug)}`)
+          .then((r) => r.json())
+          .catch(() => ({}));
+        setFinish({ certificate: info.certificate ?? null, share: info.share ?? null });
+        return;
+      }
       if (msg?.type !== "stratlearn:complete") return;
-      await flushTime.current();
-      const res = await fetch("/api/completions", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ slug, score: msg.score, lang: msg.lang ?? lang }),
-      });
-      if (!res.ok) return;
-      const out = (await res.json().catch(() => ({}))) as { ok?: boolean; score?: number; need?: number; triesLeft?: number | null; locked?: boolean };
-      if (out.ok === false) setFailed(out);
-      else setSaved(true);
+      saving.current = (async () => {
+        await flushTime.current();
+        const res = await fetch("/api/completions", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ slug, score: msg.score, lang: msg.lang ?? lang }),
+        });
+        if (!res.ok) return false;
+        const out = (await res.json().catch(() => ({}))) as { ok?: boolean; score?: number; need?: number; triesLeft?: number | null; locked?: boolean };
+        if (out.ok === false) {
+          setFailed(out);
+          return false;
+        }
+        setSaved(true);
+        return true;
+      })();
+      await saving.current;
     }
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
@@ -138,11 +165,90 @@ export function CoursePlayer({ slug, lang }: { slug: string; lang: "en" | "es" }
           )}
         </div>
       )}
-      {saved && (
+      {finish && <FinishScreen slug={slug} title={title} es={es} info={finish === "loading" ? null : finish} />}
+      {saved && !finish && (
         <p role="status" className="chip absolute bottom-4 left-1/2 -translate-x-1/2 shadow-soft">
           {lang === "es" ? "✦ ¡Curso completado y guardado!" : "✦ Course complete and saved!"}
         </p>
       )}
+    </div>
+  );
+}
+
+/** End of a course: one clear way back to My courses, plus certificate and share. */
+function FinishScreen({
+  slug,
+  title,
+  es,
+  info,
+}: {
+  slug: string;
+  title: string;
+  es: boolean;
+  info: { certificate: string | null; share: string | null } | null;
+}) {
+  const [copied, setCopied] = useState(false);
+  async function share() {
+    if (!info?.share) return;
+    const url = `${window.location.origin}/share/${info.share}`;
+    const text = es ? `¡Terminé ${title}!` : `I finished ${title}!`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: text, text, url });
+        return;
+      }
+    } catch {
+      return; // closed the share sheet
+    }
+    try {
+      await navigator.clipboard.writeText(`${text} ${url}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      window.open(url, "_blank", "noopener");
+    }
+  }
+
+  return (
+    <div className="absolute inset-0 z-10 overflow-y-auto bg-mist">
+      <div className="flex min-h-full items-center justify-center p-4">
+        <section
+          role="dialog"
+          aria-labelledby="finish-title"
+          className="card w-full max-w-md overflow-hidden text-center shadow-soft"
+        >
+          <CourseArt slug={slug} className="aspect-[16/10]" />
+          <div className="flex flex-col gap-4 p-6 sm:p-8">
+            <p className="eyebrow">✦ {es ? "Curso completado" : "Course complete"}</p>
+            <h1 id="finish-title" className="text-3xl">
+              {es ? "Terminaste " : "You finished "}
+              <em>{title}</em>
+            </h1>
+            <p className="text-muted">
+              {es
+                ? "Tu certificado quedó guardado en Mis cursos, en la sección Ya terminados."
+                : "Your certificate is saved in My courses, under Already finished."}
+            </p>
+            <Link href="/learn" className="btn btn-primary">
+              {es ? "Volver a Mis cursos" : "Back to My courses"}
+            </Link>
+            <div className="grid grid-cols-2 gap-3">
+              {info?.certificate ? (
+                <Link href={`/verify/${info.certificate}`} className="btn btn-ghost btn-sm">
+                  {es ? "Ver certificado" : "View certificate"}
+                </Link>
+              ) : (
+                <span className="btn btn-ghost btn-sm" aria-disabled>
+                  {info ? (es ? "Certificado listo pronto" : "Certificate coming") : "…"}
+                </span>
+              )}
+              <button className="btn btn-ghost btn-sm" onClick={share} disabled={!info?.share}>
+                {copied ? (es ? "¡Enlace copiado!" : "Link copied!") : es ? "Compartir" : "Share"}
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

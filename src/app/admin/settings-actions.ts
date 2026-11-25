@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { canManageTeam, inScope, logEvent, randomToken, requireStaff } from "@/lib/staff";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { readCertificate, readRecords } from "@/lib/org-settings";
+import { DEFAULT_TZ, validTz } from "@/lib/time-zones";
 import type { FormState } from "./actions";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
@@ -126,6 +127,7 @@ export async function saveRecords(_p: FormState, f: FormData): Promise<FormState
     export_frequency: freq,
     export_emails: emails.slice(0, 10),
     last_export_at: current.last_export_at,
+    time_zone: validTz(str(f, "timeZone")) ?? current.time_zone ?? DEFAULT_TZ,
   });
 }
 
