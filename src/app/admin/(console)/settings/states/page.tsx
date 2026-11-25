@@ -2,6 +2,7 @@ import Link from "next/link";
 import { canManageTeam, requireStaff } from "@/lib/staff";
 import { rulesFor } from "@/lib/state-rules";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { locationZones } from "@/lib/team-time";
 import { loadTeam } from "../../../data";
 import { PageHead } from "../../../ui";
 import { AssignToLocation, PlaceForm } from "./forms";
@@ -16,6 +17,7 @@ export default async function StateRules() {
     .select("id, name, state, city")
     .eq("org_id", s.org.id)
     .order("name");
+  const { picked } = await locationZones(s.org.id);
   const locations = (locs ?? []).filter((l) => !s.locationIds || s.locationIds.includes(l.id));
   const { data: courses } = await supabaseAdmin().from("courses").select("id, slug, title").eq("is_published", true);
   const bySlug = new Map((courses ?? []).map((c) => [c.slug, c]));
@@ -31,7 +33,7 @@ export default async function StateRules() {
       <p className="mb-2"><Link href="/admin/settings" className="label">← Team settings</Link></p>
       <PageHead eyebrow="✦ Team settings" title={<>State <em>rules</em></>} />
       <p className="mb-6 max-w-2xl text-muted">
-        Tell us which state each location is in, and we&apos;ll show the state and city training laws our courses cover there.
+        Tell us which state each location is in, and we&apos;ll show the state and city training laws our courses cover there. The state also sets the location&apos;s time zone for reports and reminder emails (pick another if needed).
         This is guidance, not legal advice. Supervisor and industry courses (like Illinois restaurants) only fit some people, so
         assign those by role.
       </p>
@@ -47,7 +49,7 @@ export default async function StateRules() {
             <section key={l.id} className="card p-6">
               <div className="flex flex-wrap items-end justify-between gap-4">
                 <h2 className="text-3xl">{l.name}</h2>
-                <PlaceForm id={l.id} state={l.state} city={l.city} disabled={!admin} />
+                <PlaceForm id={l.id} state={l.state} city={l.city} timeZone={picked[l.id] ?? null} disabled={!admin} />
               </div>
               {!l.state ? (
                 <p className="mt-4 text-sm text-muted">Pick a state to see what applies.</p>
