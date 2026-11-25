@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email";
 import { readNotify, readRecords } from "@/lib/org-settings";
+import { dayIn } from "@/lib/time-zones";
 import { STATUS_LABEL, isLate, type Status } from "@/lib/status";
 import { loadTeam, teamStatus } from "@/app/admin/data";
 import { statusRows, toCsv } from "@/app/admin/(console)/reports/rows";
@@ -45,6 +46,9 @@ type Org = { id: string; name: string; join_code: string; notify_settings?: unkn
 async function runOrg(org: Org, emailOf: Map<string, string>) {
   const db = supabaseAdmin();
   const notify = readNotify(org.notify_settings);
+  // Dates in emails and the CSV use the team's time zone.
+  const records = readRecords(org.records_settings);
+  const day = (iso: string | null | undefined) => dayIn(iso, records.time_zone);
   const now = Date.now();
   const team = await loadTeam(org.id);
   const title = new Map(team.courses.map((c) => [c.id, c.title]));
@@ -124,7 +128,6 @@ async function runOrg(org: Org, emailOf: Map<string, string>) {
   }
 
   // 3. Scheduled training report.
-  const records = readRecords(org.records_settings);
   let report = false;
   const today = new Date(now);
   const last = records.last_export_at ? new Date(records.last_export_at).getTime() : 0;
@@ -141,9 +144,9 @@ async function runOrg(org: Org, emailOf: Map<string, string>) {
     const late = rows.filter((r) => isLate(r.status)).length;
     const status = await sendEmail({
       to: records.export_emails,
-      subject: `${org.name} training report, ${today.toISOString().slice(0, 10)}`,
+      subject: `${org.name} training report, ${day(today.toISOString())}`,
       text: `Attached: training status for everyone at ${org.name}. ${late} overdue.\n\nLive view: ${SITE}/admin/reports`,
-      attachments: [{ filename: `${org.join_code.toLowerCase()}-training-status-${today.toISOString().slice(0, 10)}.csv`, content: csv }],
+      attachments: [{ filename: `${org.join_code.toLowerCase()}-training-status-${day(today.toISOString())}.csv`, content: csv }],
     });
     log.push({ org_id: org.id, kind: "report", sent_to: records.export_emails.join(", "), status });
     if (status === "sent")
@@ -157,4 +160,3 @@ async function runOrg(org: Org, emailOf: Map<string, string>) {
   return { reminders, escalations, report };
 }
 
-const day = (iso: string | null | undefined) => (iso ? iso.slice(0, 10) : "");

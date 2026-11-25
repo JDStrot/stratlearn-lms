@@ -2,6 +2,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { readCertificate } from "@/lib/org-settings";
+import { LocalDate } from "@/components/local-date";
 import { PrintButton } from "@/app/admin/(console)/badges/print-tools";
 
 /** Public page that confirms a certificate is real: /verify/<code>. */
@@ -41,8 +42,15 @@ export default async function VerifyPage({ params }: { params: Promise<{ code: s
               <p className="text-sm text-muted">Version {one(data.completions)?.course_version}</p>
             ) : null}
             <p className="mt-4 text-sm text-muted">
-              {one(data.organizations)?.name} · {new Date(data.issued_at).toLocaleDateString("en-US")}
-              {data.expires_at ? ` · valid until ${new Date(data.expires_at).toLocaleDateString("en-US")}` : ""}
+              {one(data.organizations)?.name}
+              <br />
+              Completed <LocalDate iso={data.issued_at} time />
+              {data.expires_at ? (
+                <>
+                  <br />
+                  Valid until <LocalDate iso={data.expires_at} />
+                </>
+              ) : null}
             </p>
             {brand.signer_name && (
               <p className="mt-6 border-t border-line pt-3 text-sm">

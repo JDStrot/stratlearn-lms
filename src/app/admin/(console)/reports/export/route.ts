@@ -3,14 +3,18 @@ import { inScope, logEvent, requireStaff } from "@/lib/staff";
 import { STATUS_LABEL, isCurrent, repeatLabel } from "@/lib/status";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { statusRows, toCsv } from "../rows";
-
-const day = (iso: string | null | undefined) => (iso ? iso.slice(0, 10) : "");
+import { dateTimeIn, dayIn, tzShort } from "@/lib/time-zones";
 
 export async function GET(req: NextRequest) {
   const s = await requireStaff();
   const p = req.nextUrl.searchParams;
   const type = p.get("type") ?? "status";
-  const stamp = new Date().toISOString().slice(0, 10);
+  // Dates and times in the team's time zone (Settings > Reminders & records).
+  const tz = s.org.time_zone;
+  const zone = tzShort(tz);
+  const day = (iso: string | null | undefined) => dayIn(iso, tz);
+  const when = (iso: string | null | undefined) => dateTimeIn(iso, tz);
+  const stamp = day(new Date().toISOString());
   const team = s.org.join_code.toLowerCase();
   let csv: string;
   let name: string;
@@ -42,7 +46,7 @@ export async function GET(req: NextRequest) {
     };
     const origin = req.nextUrl.origin;
     csv = toCsv(
-      ["Name", "Sign-in name", "Employee ID", "Course", "Course ID", "Version", "Completed (UTC)", "Valid until", "Score", "Minutes spent", "Final-check tries", "Language", "Certificate code", "Verify link"],
+      ["Name", "Sign-in name", "Employee ID", "Course", "Course ID", "Version", `Completed (${zone})`, "Valid until", "Score", "Minutes spent", "Final-check tries", "Language", "Certificate code", "Verify link"],
       ((data ?? []) as unknown as Row[]).filter((r) => inScope(s, r.learners?.location_id ?? null)).map((r) => {
         const cert = Array.isArray(r.certificates) ? r.certificates[0] : r.certificates;
         return [
@@ -52,7 +56,7 @@ export async function GET(req: NextRequest) {
           r.courses?.title,
           r.courses?.slug,
           r.course_version,
-          r.completed_at.replace("T", " ").slice(0, 19),
+          when(r.completed_at),
           day(cert?.expires_at),
           r.score,
           r.seconds_spent ? Math.round(r.seconds_spent / 6) / 10 : "",
@@ -83,14 +87,14 @@ export async function GET(req: NextRequest) {
       .filter((r) => inScope(s, r.learners?.location_id ?? null))
       .sort((a, b) => b.at.localeCompare(a.at));
     csv = toCsv(
-      ["Name", "Sign-in name", "Employee ID", "Course", "Course ID", "When (UTC)", "Score", "Result"],
+      ["Name", "Sign-in name", "Employee ID", "Course", "Course ID", `When (${zone})`, "Score", "Result"],
       rows.map((r) => [
         r.learners?.display_name,
         r.learners?.username,
         r.learners?.employee_id,
         r.courses?.title,
         r.courses?.slug,
-        r.at.replace("T", " ").slice(0, 19),
+        when(r.at),
         r.score,
         r.passed ? "Passed" : "Not passed",
       ]),
@@ -106,8 +110,8 @@ export async function GET(req: NextRequest) {
     const { data: users } = await supabaseAdmin().auth.admin.listUsers({ page: 1, perPage: 1000 });
     const email = new Map((users?.users ?? []).map((u) => [u.id, u.email ?? ""]));
     csv = toCsv(
-      ["When (UTC)", "Manager", "Action", "Details"],
-      (data ?? []).map((r) => [r.created_at.replace("T", " ").slice(0, 19), email.get(r.actor_id) ?? "", r.action, JSON.stringify(r.details)]),
+      [`When (${zone})`, "Manager", "Action", "Details"],
+      (data ?? []).map((r) => [when(r.created_at), email.get(r.actor_id) ?? "", r.action, JSON.stringify(r.details)]),
     );
     name = `${team}-manager-activity-${stamp}.csv`;
   } else {

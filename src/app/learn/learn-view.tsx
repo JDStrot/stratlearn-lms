@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Course } from "@/lib/learner";
 import { CourseArt } from "./course-art";
+import { LocalDate } from "@/components/local-date";
 
 export type LearnItem = {
   course: Course;
@@ -30,11 +31,7 @@ export function LearnView({
   const done = items.filter((i) => i.completedAt);
   const pct = items.length ? Math.round((done.length / items.length) * 100) : 0;
   const title = (c: Course) => (es && c.title_es) || c.title;
-  const date = (d: string) =>
-    new Date(d).toLocaleDateString(es ? "es" : "en", {
-      month: "short",
-      day: "numeric",
-    });
+  const date = (d: string) => <LocalDate iso={d} lang={es ? "es" : "en"} opts={{ month: "short", day: "numeric" }} />;
 
   return (
     <main id="main" className="flex-1">
@@ -183,7 +180,8 @@ export function LearnView({
                       <span className="block font-medium">{title(course)}</span>
                       {completedAt && (
                         <span className="text-sm text-muted">
-                          {es ? "Terminado" : "Finished"} {date(completedAt)} ·{" "}
+                          {es ? "Terminado" : "Finished"}{" "}
+                          <LocalDate iso={completedAt} lang={es ? "es" : "en"} time opts={{ month: "short", day: "numeric" }} /> ·{" "}
                           {es ? "Repasar" : "Review"}
                         </span>
                       )}
