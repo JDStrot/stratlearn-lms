@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { logEvent, requireStaff } from "@/lib/staff";
-import { STATUS_LABEL } from "@/lib/status";
+import { STATUS_LABEL, isCurrent, repeatLabel } from "@/lib/status";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { statusRows, toCsv } from "../rows";
 
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     const { data } = await db
       .from("completions")
       .select(
-        "completed_at, course_version, language, score, learners(display_name, username, employee_id), courses(slug, title), certificates(verify_code)",
+        "completed_at, course_version, language, score, learners(display_name, username, employee_id), courses(slug, title), certificates(verify_code, expires_at)",
       )
       .eq("org_id", s.org.id)
       .order("completed_at", { ascending: false })
@@ -32,11 +32,11 @@ export async function GET(req: NextRequest) {
       score: number | null;
       learners: { display_name: string; username: string; employee_id: string | null } | null;
       courses: { slug: string; title: string } | null;
-      certificates: { verify_code: string }[] | { verify_code: string } | null;
+      certificates: { verify_code: string; expires_at: string | null }[] | { verify_code: string; expires_at: string | null } | null;
     };
     const origin = req.nextUrl.origin;
     csv = toCsv(
-      ["Name", "Sign-in name", "Employee ID", "Course", "Course ID", "Version", "Completed (UTC)", "Score", "Language", "Certificate code", "Verify link"],
+      ["Name", "Sign-in name", "Employee ID", "Course", "Course ID", "Version", "Completed (UTC)", "Valid until", "Score", "Language", "Certificate code", "Verify link"],
       ((data ?? []) as unknown as Row[]).map((r) => {
         const cert = Array.isArray(r.certificates) ? r.certificates[0] : r.certificates;
         return [
@@ -47,6 +47,7 @@ export async function GET(req: NextRequest) {
           r.courses?.slug,
           r.course_version,
           r.completed_at.replace("T", " ").slice(0, 19),
+          day(cert?.expires_at),
           r.score,
           r.language,
           cert?.verify_code,
@@ -77,8 +78,22 @@ export async function GET(req: NextRequest) {
       course: p.get("course") ?? undefined,
     });
     csv = toCsv(
-      ["Name", "Sign-in name", "Employee ID", "Role", "Location", "Course", "Status", "Due", "Finished", "Score", "Repeats (months)"],
-      rows.map((r) => [r.name, r.username, r.employeeId, r.role, r.location, r.course, STATUS_LABEL[r.status], day(r.dueAt), day(r.completedAt), r.score, r.repeats]),
+      ["Name", "Sign-in name", "Employee ID", "Role", "Location", "Course", "Status", "Compliant now", "Due / retrain by", "Last finished", "Version finished", "Score", "Repeats"],
+      rows.map((r) => [
+        r.name,
+        r.username,
+        r.employeeId,
+        r.role,
+        r.location,
+        r.course,
+        STATUS_LABEL[r.status],
+        isCurrent(r.status) ? "Yes" : "No",
+        day(r.dueAt),
+        day(r.completedAt ?? r.lastFinishedAt),
+        r.version,
+        r.score,
+        repeatLabel(r.repeats),
+      ]),
     );
     name = `${team}-training-status-${stamp}.csv`;
   }

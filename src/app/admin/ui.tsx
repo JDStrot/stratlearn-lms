@@ -17,6 +17,7 @@ const TONE: Record<Status, string> = {
   done: "border-success/40 bg-success/10 text-success",
   due: "border-lilac bg-white text-plum",
   overdue: "border-error/40 bg-error/10 text-error",
+  renew: "border-violet/40 bg-violet/10 text-violet",
   expired: "border-error/40 bg-error/10 text-error",
 };
 

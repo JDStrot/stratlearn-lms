@@ -8,7 +8,7 @@ export default async function VerifyPage({ params }: { params: Promise<{ code: s
   const clean = code.toUpperCase().replace(/[^A-F0-9]/g, "");
   const { data } = await supabaseAdmin()
     .from("certificates")
-    .select("issued_at, expires_at, learners(display_name), courses(title), organizations(name)")
+    .select("issued_at, expires_at, learners(display_name), courses(title), organizations(name), completions(course_version)")
     .eq("verify_code", clean)
     .maybeSingle();
 
@@ -29,6 +29,9 @@ export default async function VerifyPage({ params }: { params: Promise<{ code: s
             <p className="mt-5 text-lg font-medium">{one(data.learners)?.display_name}</p>
             <p className="text-muted">completed</p>
             <p className="text-lg font-medium">{one(data.courses)?.title}</p>
+            {one(data.completions)?.course_version ? (
+              <p className="text-sm text-muted">Version {one(data.completions)?.course_version}</p>
+            ) : null}
             <p className="mt-4 text-sm text-muted">
               {one(data.organizations)?.name} · {new Date(data.issued_at).toLocaleDateString("en-US")}
               {data.expires_at ? ` · valid until ${new Date(data.expires_at).toLocaleDateString("en-US")}` : ""}

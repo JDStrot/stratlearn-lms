@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { canManageTeam, requireStaff } from "@/lib/staff";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { removeGroup, removeStaff, startTablet } from "../../actions";
@@ -40,6 +41,14 @@ export default async function Settings() {
               <button className="btn btn-primary btn-sm">Make this device the team tablet</button>
             </form>
           )}
+        </section>
+
+        <section className="card flex flex-col gap-3 p-6 lg:col-span-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="mb-1 text-3xl">Due dates &amp; <em>retraining</em></h2>
+            <p className="text-sm text-muted">Default due dates, grace days, and which courses repeat every year or two.</p>
+          </div>
+          <Link href="/admin/settings/retraining" className="btn btn-primary btn-sm self-start">Open</Link>
         </section>
 
         {(["role", "location"] as const).map((kind) => {

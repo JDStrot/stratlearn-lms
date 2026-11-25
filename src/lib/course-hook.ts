@@ -15,8 +15,20 @@ import "server-only";
  *    If a pass was saved but never reached the app (signal lost), it is sent
  *    again the next time the course opens.
  */
-export function courseHook(opts: { learnerId: string; slug: string; courseVersion: number; completed: boolean }) {
-  const prefix = `sl:${opts.learnerId}:${opts.slug}:v${opts.courseVersion}:`;
+export function courseHook(opts: {
+  learnerId: string;
+  slug: string;
+  courseVersion: number;
+  completed: boolean;
+  /**
+   * Retraining round. When a course comes back for retraining (or a manager
+   * asks for a retake), saves go under a fresh name, so last time's "passed"
+   * can't count as this time's finish. Empty for a first attempt and for
+   * reviewing a finished course.
+   */
+  round?: string;
+}) {
+  const prefix = `sl:${opts.learnerId}:${opts.slug}:v${opts.courseVersion}:${opts.round ? `r${opts.round}:` : ""}`;
   const js = `(function(){
 var P=${JSON.stringify(prefix)},DONE=${opts.completed ? "true" : "false"},sent=false;
 var proto=Storage.prototype,g=proto.getItem,s=proto.setItem,r=proto.removeItem,ls=null;

@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { readSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { assignedCourseBySlug } from "@/lib/course-access";
+import { assignedCourses } from "@/lib/learner";
+import { addMonths } from "@/lib/status";
 import type { Learner } from "@/lib/learner";
 
 /**
@@ -26,8 +27,9 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
   if (!learner) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
-  const course = await assignedCourseBySlug(learner as Learner, body.slug);
-  if (!course) return NextResponse.json({ error: "course not assigned" }, { status: 404 });
+  const item = (await assignedCourses(learner as Learner)).find((i) => i.course.slug === body.slug);
+  if (!item) return NextResponse.json({ error: "course not assigned" }, { status: 404 });
+  const { course } = item;
 
   const score =
     typeof body.score === "number" && body.score >= 0 && body.score <= 100
@@ -45,7 +47,7 @@ export async function POST(req: NextRequest) {
       language,
       score,
     })
-    .select("id")
+    .select("id, completed_at")
     .single();
   if (error || !completion) {
     console.error("completion insert failed", error);
@@ -59,6 +61,8 @@ export async function POST(req: NextRequest) {
       org_id: learner.org_id,
       learner_id: learner.id,
       course_id: course.id,
+      // Printed as "valid until" when this course has a retraining clock.
+      expires_at: item.recurrenceMonths ? addMonths(completion.completed_at, item.recurrenceMonths).toISOString() : null,
     })
     .select("verify_code")
     .single();

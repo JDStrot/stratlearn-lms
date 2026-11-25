@@ -1,5 +1,5 @@
 import "server-only";
-import { isLate, type Status } from "@/lib/status";
+import { STATUS_ORDER, isCurrent, isLate, type Status } from "@/lib/status";
 import { loadTeam, nameOf, teamStatus } from "../../data";
 
 export type ReportFilter = { status?: string; role?: string; location?: string; course?: string };
@@ -21,7 +21,9 @@ export async function statusRows(orgId: string, f: ReportFilter) {
     dueAt: string | null;
     completedAt: string | null;
     score: number | null;
+    version: number | null;
     repeats: number | null;
+    lastFinishedAt: string | null;
   }[] = [];
   for (const { person, statuses } of teamStatus(team)) {
     if (f.role && person.job_role_id !== f.role) continue;
@@ -29,8 +31,9 @@ export async function statusRows(orgId: string, f: ReportFilter) {
     for (const st of statuses) {
       if (f.course && st.courseId !== f.course) continue;
       if (f.status === "late" && !isLate(st.status)) continue;
-      if (f.status === "done" && st.status !== "done") continue;
+      if (f.status === "done" && !isCurrent(st.status)) continue;
       if (f.status === "due" && st.status !== "due") continue;
+      if (f.status === "renew" && st.status !== "renew") continue;
       rows.push({
         personId: person.id,
         name: person.display_name,
@@ -44,12 +47,13 @@ export async function statusRows(orgId: string, f: ReportFilter) {
         dueAt: st.dueAt,
         completedAt: st.completedAt,
         score: st.score,
+        version: st.completedVersion,
         repeats: st.recurrenceMonths,
+        lastFinishedAt: st.lastFinishedAt,
       });
     }
   }
-  const order = { overdue: 0, expired: 1, due: 2, done: 3 } as const;
-  rows.sort((a, b) => order[a.status] - order[b.status] || a.name.localeCompare(b.name) || a.course.localeCompare(b.course));
+  rows.sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || a.name.localeCompare(b.name) || a.course.localeCompare(b.course));
   return { team, rows };
 }
 

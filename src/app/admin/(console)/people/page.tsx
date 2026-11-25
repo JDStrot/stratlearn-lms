@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireStaff } from "@/lib/staff";
+import { isCurrent, isLate } from "@/lib/status";
 import { fmtDate, loadTeam, nameOf, teamStatus } from "../../data";
 import { PageHead } from "../../ui";
 import { AddPeople } from "./add-people";
@@ -76,8 +77,8 @@ export default async function PeoplePage({ searchParams }: { searchParams: Searc
             )}
             {people.map((p) => {
               const st = status.get(p.id) ?? [];
-              const done = st.filter((x) => x.status === "done").length;
-              const late = st.filter((x) => x.status === "overdue" || x.status === "expired").length;
+              const done = st.filter((x) => isCurrent(x.status)).length;
+              const late = st.filter((x) => isLate(x.status)).length;
               const locked = p.locked_until && new Date(p.locked_until) > new Date();
               return (
                 <tr key={p.id} className={p.is_active ? "" : "opacity-60"}>

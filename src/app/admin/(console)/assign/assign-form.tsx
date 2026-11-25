@@ -13,8 +13,11 @@ export function AssignForm({
   roles,
   locations,
   people,
+  defaultDueDays,
 }: {
   defaultWho?: string;
+  /** Team setting: days until due for new assignments (null = no due date). */
+  defaultDueDays: number | null;
   courses: { id: string; title: string; minutes: number | null }[];
   packs: { id: string; title: string; paths: { path: string; count: number }[] }[];
   roles: Named[];
@@ -24,7 +27,10 @@ export function AssignForm({
   const [state, action, pending] = useActionState<FormState, FormData>(assignTraining, {});
   const [kind, setKind] = useState<"pack" | "course">(packs.length ? "pack" : "course");
   const [packId, setPackId] = useState(packs[0]?.id ?? "");
-  const [due, setDue] = useState("30");
+  const presetDays = ["7", "14", "30", "60", "90"];
+  const initialDue = defaultDueDays == null ? "none" : String(defaultDueDays);
+  const [due, setDue] = useState(initialDue);
+  const [repeat, setRepeat] = useState("");
   const pack = packs.find((p) => p.id === packId);
 
   return (
@@ -103,7 +109,11 @@ export function AssignForm({
             <option value="7">In 1 week</option>
             <option value="14">In 2 weeks</option>
             <option value="30">In 30 days</option>
+            <option value="60">In 60 days</option>
             <option value="90">In 90 days</option>
+            {!presetDays.includes(initialDue) && initialDue !== "none" && (
+              <option value={initialDue}>In {initialDue} days</option>
+            )}
             <option value="date">On a date...</option>
             <option value="none">No due date</option>
           </select>
@@ -111,14 +121,28 @@ export function AssignForm({
         {due === "date" && (
           <Field label="Due date"><input type="date" name="dueDate" required className="field" /></Field>
         )}
-        <Field label="Repeat" hint="Retraining clock, for training the law says to redo">
-          <select name="repeat" defaultValue="" className="field">
-            <option value="">Just once</option>
+        <Field label="Retraining" hint="The course rule follows the law, e.g. California harassment every 2 years">
+          <select name={repeat === "custom" ? undefined : "repeat"} value={repeat} onChange={(e) => setRepeat(e.target.value)} className="field">
+            <option value="">Use the course rule</option>
+            <option value="never">Never, just once</option>
             <option value="12">Every year</option>
             <option value="24">Every 2 years</option>
             <option value="36">Every 3 years</option>
+            <option value="custom">Every ... months</option>
           </select>
         </Field>
+        {repeat === "custom" && (
+          <Field label="Months between retraining">
+            <input type="number" name="repeat" min={1} max={240} required className="field" />
+          </Field>
+        )}
+        <label className="flex items-start gap-3 text-[0.95rem]">
+          <input type="checkbox" name="retake" className="mt-1 size-4 accent-plum" />
+          <span>
+            Have them take it again
+            <span className="block text-sm text-muted">Even if they finished it before. Old records and certificates stay on file.</span>
+          </span>
+        </label>
       </fieldset>
 
       <div className="flex flex-col gap-3 lg:col-span-3">

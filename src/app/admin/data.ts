@@ -1,6 +1,8 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { loadRetrainRules } from "@/lib/retrain";
 import {
+  applyRetrainRules,
   learnerStatuses,
   type AssignmentRow,
   type CompletionRow,
@@ -38,27 +40,35 @@ const PERSON_COLS =
 /** Everything the console needs about one team, in one round of queries. */
 export async function loadTeam(orgId: string) {
   const db = supabaseAdmin();
-  const [people, roles, locations, assignments, completions, courses] = await Promise.all([
+  const [people, roles, locations, assignments, completions, courses, rules] = await Promise.all([
     db.from("learners").select(PERSON_COLS).eq("org_id", orgId).order("display_name"),
     db.from("job_roles").select("id, name").eq("org_id", orgId).order("name"),
     db.from("locations").select("id, name").eq("org_id", orgId).order("name"),
     db
       .from("assignments")
-      .select("id, course_id, learner_id, job_role_id, location_id, due_at, recurrence_months, pack_id, pack_path, created_at")
+      // "*" so this keeps working before and after the retraining database update.
+      .select("*")
       .eq("org_id", orgId),
     db
       .from("completions")
-      .select("learner_id, course_id, completed_at, score")
+      .select("learner_id, course_id, completed_at, score, course_version")
       .eq("org_id", orgId)
       .order("completed_at", { ascending: false })
       .limit(50000),
     db.from("courses").select("id, slug, title, minutes").eq("is_published", true).order("title"),
+    loadRetrainRules(orgId),
   ]);
+  type A = AssignmentRow & { pack_path: string | null };
+  const raw = (assignments.data ?? []) as A[];
   return {
     people: (people.data ?? []) as Person[],
     roles: (roles.data ?? []) as Named[],
     locations: (locations.data ?? []) as Named[],
-    assignments: (assignments.data ?? []) as (AssignmentRow & { pack_path: string | null })[],
+    /** As the managers set them (repeat = only what they picked). */
+    rawAssignments: raw,
+    /** With the real retraining clock filled in from team and course rules. */
+    assignments: applyRetrainRules(raw, rules),
+    rules,
     completions: (completions.data ?? []) as CompletionRow[],
     courses: (courses.data ?? []) as CourseLite[],
   };
@@ -71,7 +81,7 @@ export function teamStatus(team: Team) {
   const rows: { person: Person; statuses: CourseStatus[] }[] = [];
   for (const p of team.people) {
     if (!p.is_active) continue;
-    rows.push({ person: p, statuses: learnerStatuses(p, team.assignments, team.completions) });
+    rows.push({ person: p, statuses: learnerStatuses(p, team.assignments, team.completions, new Date(), team.rules.timing) });
   }
   return rows;
 }

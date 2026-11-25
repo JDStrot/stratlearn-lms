@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { learnerStatuses, type AssignmentRow, type CompletionRow } from "@/lib/status";
+import { readTrainingSettings, timingOf } from "@/lib/retrain";
+import { applyRetrainRules, isCurrent, isLate, learnerStatuses, type AssignmentRow, type CompletionRow } from "@/lib/status";
 import { openClient, requireOwner } from "../../owner-actions";
 import { fmtDate } from "../../data";
 import { PageHead, Stat } from "../../ui";
@@ -12,13 +13,16 @@ export const metadata = { title: "STRATLEARN · Owner portal" };
 export default async function OwnerHome() {
   await requireOwner();
   const db = supabaseAdmin();
-  const [orgs, learners, assignments, completions, packs] = await Promise.all([
-    db.from("organizations").select("id, name, join_code, plan, status, seat_limit, created_at").order("name"),
+  const [orgs, learners, assignments, completions, packs, defaults, teamRules] = await Promise.all([
+    db.from("organizations").select("*").order("name"),
     db.from("learners").select("id, org_id, job_role_id, location_id, is_active, last_login_at").limit(100000),
-    db.from("assignments").select("id, org_id, course_id, learner_id, job_role_id, location_id, due_at, recurrence_months, created_at").limit(100000),
+    db.from("assignments").select("*").limit(100000),
     db.from("completions").select("org_id, learner_id, course_id, completed_at").limit(200000),
     db.from("packs").select("id, title").eq("is_published", true).order("title"),
+    db.from("courses").select("id, default_recurrence_months").not("default_recurrence_months", "is", null),
+    db.from("org_course_settings").select("org_id, course_id, recurrence_months"),
   ]);
+  const courseDefault = new Map((defaults.error ? [] : defaults.data ?? []).map((c) => [c.id as string, c.default_recurrence_months as number | null]));
 
   type Agg = { people: number; assigned: number; done: number; late: number; lastActive: string | null; month: number };
   const agg = new Map<string, Agg>();
@@ -31,16 +35,20 @@ export default async function OwnerHome() {
   const L = byOrg(learners.data), A = byOrg(assignments.data), C = byOrg(completions.data);
   for (const o of orgs.data ?? []) {
     const a: Agg = { people: 0, assigned: 0, done: 0, late: 0, lastActive: null, month: 0 };
-    const as = (A.get(o.id) ?? []) as AssignmentRow[];
+    const teamRule = new Map(
+      (teamRules.error ? [] : teamRules.data ?? []).filter((t) => t.org_id === o.id).map((t) => [t.course_id as string, t.recurrence_months as number | null]),
+    );
+    const as = applyRetrainRules((A.get(o.id) ?? []) as AssignmentRow[], { courseDefault, teamRule });
+    const timing = timingOf(readTrainingSettings((o as { training_settings?: unknown }).training_settings));
     const cs = (C.get(o.id) ?? []) as CompletionRow[];
     for (const l of L.get(o.id) ?? []) {
       if (!l.is_active) continue;
       a.people++;
       if (l.last_login_at && (!a.lastActive || l.last_login_at > a.lastActive)) a.lastActive = l.last_login_at;
-      for (const st of learnerStatuses(l, as, cs)) {
+      for (const st of learnerStatuses(l, as, cs, new Date(), timing)) {
         a.assigned++;
-        if (st.status === "done") a.done++;
-        if (st.status === "overdue" || st.status === "expired") a.late++;
+        if (isCurrent(st.status)) a.done++;
+        if (isLate(st.status)) a.late++;
       }
     }
     a.month = cs.filter((c) => new Date(c.completed_at).getTime() > monthAgo).length;
