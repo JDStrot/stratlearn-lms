@@ -82,31 +82,36 @@ async function loadLanguages(orgId: string): Promise<{ rows: LangRow[]; tracking
   const db = supabaseAdmin();
   const full = await db
     .from("completions")
-    .select("learner_id, course_id, completed_at, language, seconds_spent, attempts")
+    .select("learner_id, course_id, completed_at, language, score, seconds_spent, attempts")
     .eq("org_id", orgId)
     .limit(50000);
   if (!full.error) return { rows: (full.data ?? []) as LangRow[], tracking: true };
   // Time-and-tries database update not run yet.
   const { data } = await db
     .from("completions")
-    .select("learner_id, course_id, completed_at, language")
+    .select("learner_id, course_id, completed_at, language, score")
     .eq("org_id", orgId)
     .limit(50000);
   return { rows: (data ?? []) as LangRow[], tracking: false };
 }
 
-async function loadTries(orgId: string): Promise<TryRow[]> {
+/** Every final-check try: failed ones from course_attempts, passes from completions. */
+async function loadTries(orgId: string, passes: LangRow[]): Promise<TryRow[]> {
   const { data, error } = await supabaseAdmin()
-    .from("quiz_attempts")
-    .select("learner_id, course_id, score, passed, attempted_at")
+    .from("course_attempts")
+    .select("learner_id, course_id, score, created_at")
     .eq("org_id", orgId)
+    .eq("kind", "attempt")
     .limit(100000);
-  return error ? [] : ((data ?? []) as TryRow[]);
+  const failed = error ? [] : (data ?? []).map((r) => ({ learner_id: r.learner_id, course_id: r.course_id, score: r.score, passed: false, attempted_at: r.created_at }));
+  const passed = passes.map((c) => ({ learner_id: c.learner_id, course_id: c.course_id, score: c.score ?? null, passed: true, attempted_at: c.completed_at }));
+  return [...failed, ...passed];
 }
 
 export async function teamInsights(team: Team, orgId: string, f: Filter, now = new Date()) {
   const ids = teamStatus(team).map((r) => r.person.id);
-  const [progress, langs, tries] = await Promise.all([loadProgress(ids), loadLanguages(orgId), loadTries(orgId)]);
+  const [progress, langs] = await Promise.all([loadProgress(ids), loadLanguages(orgId)]);
+  const tries = await loadTries(orgId, langs.rows);
   return computeInsights(team, f, progress, langs.rows, now, { tries, tracking: langs.tracking });
 }
 
@@ -116,6 +121,7 @@ type LangRow = {
   course_id: string;
   completed_at: string;
   language: string | null;
+  score?: number | null;
   seconds_spent?: number | null;
   attempts?: number | null;
 };

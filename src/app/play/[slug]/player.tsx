@@ -14,6 +14,7 @@ export function CoursePlayer({ slug, lang }: { slug: string; lang: "en" | "es" }
   const frame = useRef<HTMLIFrameElement>(null);
   const [saved, setSaved] = useState(false);
   const flushTime = useRef<() => Promise<unknown>>(async () => {});
+  const onFrameLoad = useRef<() => void>(() => {});
 
   // Active time in the course: counts while the tab is visible and the learner
   // has tapped, typed or scrolled in the last 2 minutes. Sent every 30 seconds,
@@ -28,14 +29,14 @@ export function CoursePlayer({ slug, lang }: { slug: string; lang: "en" | "es" }
       for (const ev of evs) w.addEventListener(ev, touch, { passive: true, capture: true });
     };
     watch(window);
-    const f = frame.current;
-    const onLoad = () => {
+    // The course frame is swapped for a fresh one on "Try again", so it
+    // reports each load through onFrameLoad.
+    onFrameLoad.current = () => {
       touch();
       try {
-        watch(f?.contentWindow);
+        watch(frame.current?.contentWindow);
       } catch {}
     };
-    f?.addEventListener("load", onLoad);
     const send = async (beacon = false) => {
       const seconds = Math.round(pending);
       if (seconds < 1) return;
@@ -60,10 +61,12 @@ export function CoursePlayer({ slug, lang }: { slug: string; lang: "en" | "es" }
       clearInterval(flush);
       document.removeEventListener("visibilitychange", onHide);
       window.removeEventListener("pagehide", onLeave);
-      f?.removeEventListener("load", onLoad);
       void send(true);
     };
   }, [slug]);
+  // Score under the team's passing bar: a failed try.
+  const [failed, setFailed] = useState<{ score?: number; need?: number; triesLeft?: number | null; locked?: boolean } | null>(null);
+  const [round, setRound] = useState(0);
 
   useEffect(() => {
     async function onMessage(e: MessageEvent) {
@@ -85,21 +88,56 @@ export function CoursePlayer({ slug, lang }: { slug: string; lang: "en" | "es" }
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ slug, score: msg.score, lang: msg.lang ?? lang }),
       });
-      if (res.ok) setSaved(true);
+      if (!res.ok) return;
+      const out = (await res.json().catch(() => ({}))) as { ok?: boolean; score?: number; need?: number; triesLeft?: number | null; locked?: boolean };
+      if (out.ok === false) setFailed(out);
+      else setSaved(true);
     }
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, [slug, lang]);
 
+  const es = lang === "es";
   return (
     <div className="relative flex-1">
       <iframe
         ref={frame}
-        src={`/play/${slug}/content#lang=${lang}`}
+        key={round}
+        src={`/play/${slug}/content?try=${round}#lang=${lang}`}
         title="Course"
         className="absolute inset-0 size-full border-0"
         allow="fullscreen; autoplay"
+        onLoad={() => onFrameLoad.current()}
       />
+      {failed && (
+        <div role="alert" className="card absolute bottom-4 left-1/2 flex w-[calc(100%-32px)] max-w-md -translate-x-1/2 flex-col gap-3 p-5 shadow-soft">
+          <p>
+            {es
+              ? `Obtuviste ${failed.score ?? "?"}%. Necesitas ${failed.need ?? "?"}% para aprobar.`
+              : `You scored ${failed.score ?? "?"}%. You need ${failed.need ?? "?"}% to pass.`}{" "}
+            {failed.locked
+              ? es
+                ? "Pide a tu gerente más intentos."
+                : "Ask your manager for more tries."
+              : failed.triesLeft != null
+                ? es
+                  ? `Te quedan ${failed.triesLeft} intentos.`
+                  : `${failed.triesLeft} ${failed.triesLeft === 1 ? "try" : "tries"} left.`
+                : ""}
+          </p>
+          {!failed.locked && (
+            <button
+              className="btn btn-primary btn-sm self-start"
+              onClick={() => {
+                setFailed(null);
+                setRound((n) => n + 1);
+              }}
+            >
+              {es ? "Intentar de nuevo" : "Try again"}
+            </button>
+          )}
+        </div>
+      )}
       {saved && (
         <p role="status" className="chip absolute bottom-4 left-1/2 -translate-x-1/2 shadow-soft">
           {lang === "es" ? "✦ ¡Curso completado y guardado!" : "✦ Course complete and saved!"}

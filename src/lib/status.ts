@@ -13,6 +13,8 @@ export type AssignmentRow = {
   recurrence_custom?: boolean | null;
   /** Finishes before this don't count for this assignment ("take it again"). */
   retake_after?: string | null;
+  /** Group assignments: due N days after the later of the assignment and the person's start. */
+  due_within_days?: number | null;
   course_id: string;
   learner_id: string | null;
   job_role_id: string | null;
@@ -23,11 +25,27 @@ export type AssignmentRow = {
   created_at: string;
 };
 
+const DAY = 86_400_000;
+
 export type LearnerTarget = {
   id: string;
   job_role_id: string | null;
   location_id: string | null;
+  /** Start date (new hires); falls back to when they were added. */
+  start_date?: string | null;
+  created_at?: string | null;
 };
+
+/** The due date of one assignment for one person (new hires get their own window). */
+export function dueFor(a: AssignmentRow, l: LearnerTarget): string | null {
+  if (a.due_within_days == null) return a.due_at;
+  const startRaw = l.start_date ? `${l.start_date}T12:00:00Z` : l.created_at;
+  const t = (v: string | null | undefined) => (v ? new Date(v).getTime() || 0 : 0);
+  const from = Math.max(t(a.created_at), t(a.retake_after), t(startRaw));
+  const d = new Date(from + a.due_within_days * DAY);
+  d.setUTCHours(23, 59, 0, 0);
+  return d.toISOString();
+}
 
 export type CompletionRow = {
   learner_id: string;
@@ -87,7 +105,6 @@ export function addMonths(iso: string, months: number): Date {
   return d;
 }
 
-const DAY = 86_400_000;
 
 /** Status of every course assigned to one learner. */
 export function learnerStatuses(
@@ -103,12 +120,13 @@ export function learnerStatuses(
   for (const a of assignments) {
     if (!appliesTo(a, learner)) continue;
     const retake = a.retake_after ?? null;
+    const due = dueFor(a, learner);
     const prev = merged.get(a.course_id);
     if (!prev) {
-      merged.set(a.course_id, { dueAt: a.due_at, recurrence: a.recurrence_months, retakeAfter: retake });
+      merged.set(a.course_id, { dueAt: due, recurrence: a.recurrence_months, retakeAfter: retake });
       continue;
     }
-    if (a.due_at && (!prev.dueAt || a.due_at < prev.dueAt)) prev.dueAt = a.due_at;
+    if (due && (!prev.dueAt || due < prev.dueAt)) prev.dueAt = due;
     if (a.recurrence_months && (!prev.recurrence || a.recurrence_months < prev.recurrence))
       prev.recurrence = a.recurrence_months;
     if (retake && (!prev.retakeAfter || retake > prev.retakeAfter)) prev.retakeAfter = retake;

@@ -5,8 +5,8 @@ import { loadTeam, nameOf, teamStatus } from "../../data";
 export type ReportFilter = { status?: string; role?: string; location?: string; course?: string };
 
 /** One row per person per assigned course, filtered like the Reports page. */
-export async function statusRows(orgId: string, f: ReportFilter) {
-  const team = await loadTeam(orgId);
+export async function statusRows(orgId: string, f: ReportFilter, locationIds: string[] | null = null) {
+  const team = await loadTeam(orgId, locationIds);
   const course = new Map(team.courses.map((c) => [c.id, c.title]));
   const rows: {
     personId: string;

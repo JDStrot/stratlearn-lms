@@ -14,7 +14,10 @@ export function AssignForm({
   locations,
   people,
   defaultDueDays,
+  limited = false,
 }: {
+  /** Manager limited to some locations: no "everyone" or role-wide choices. */
+  limited?: boolean;
   defaultWho?: string;
   /** Team setting: days until due for new assignments (null = no due date). */
   defaultDueDays: number | null;
@@ -81,9 +84,9 @@ export function AssignForm({
       <fieldset className="flex flex-col gap-4">
         <legend className="mb-3 font-serif text-2xl text-plum">2. Who</legend>
         <Field label="Assign to" hint="New people who join a role or location get it too">
-          <select name="who" defaultValue={defaultWho ?? "all"} className="field">
-            <option value="all">Everyone on the team</option>
-            {roles.length > 0 && (
+          <select name="who" defaultValue={defaultWho ?? (limited ? undefined : "all")} className="field">
+            {!limited && <option value="all">Everyone on the team</option>}
+            {!limited && roles.length > 0 && (
               <optgroup label="Everyone in a role">
                 {roles.map((r) => <option key={r.id} value={`role:${r.id}`}>{r.name}</option>)}
               </optgroup>
@@ -104,7 +107,7 @@ export function AssignForm({
 
       <fieldset className="flex flex-col gap-4">
         <legend className="mb-3 font-serif text-2xl text-plum">3. When</legend>
-        <Field label="Due">
+        <Field label="Due" hint="For a role, location or the whole team, new hires get the same number of days from their start date">
           <select name="dueDays" value={due} onChange={(e) => setDue(e.target.value)} className="field">
             <option value="7">In 1 week</option>
             <option value="14">In 2 weeks</option>

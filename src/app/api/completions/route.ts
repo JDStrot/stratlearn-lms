@@ -3,6 +3,8 @@ import { readSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { assignedCourses } from "@/lib/learner";
 import { addMonths } from "@/lib/status";
+import { attemptState, roundStartOf } from "@/lib/attempts";
+import { loadOrgSettings } from "@/lib/org-settings";
 import type { Learner } from "@/lib/learner";
 
 /**
@@ -21,7 +23,7 @@ export async function POST(req: NextRequest) {
   const db = supabaseAdmin();
   const { data: learner } = await db
     .from("learners")
-    .select("id, org_id, display_name, preferred_language, job_role_id, location_id")
+    .select("id, org_id, display_name, preferred_language, job_role_id, location_id, start_date, created_at")
     .eq("id", session.lid)
     .eq("is_active", true)
     .maybeSingle();
@@ -36,6 +38,26 @@ export async function POST(req: NextRequest) {
       ? Math.round(body.score)
       : null;
   const language = body.lang === "es" ? "es" : "en";
+
+  // Team passing score and tries. A score under the bar is a failed try, not a finish.
+  const { quiz } = await loadOrgSettings(learner.org_id);
+  if (quiz.pass_score != null || quiz.max_attempts != null) {
+    const start = roundStartOf(item.lastFinishedAt, item.retakeAfter, item.completedAt);
+    const before = await attemptState(learner.id, course.id, start, quiz);
+    if (before.locked) return NextResponse.json({ ok: false, locked: true, need: quiz.pass_score });
+    if (quiz.pass_score != null && score != null && score < quiz.pass_score) {
+      await db.from("course_attempts").insert({
+        org_id: learner.org_id,
+        learner_id: learner.id,
+        course_id: course.id,
+        course_version: course.version,
+        kind: "attempt",
+        score,
+      });
+      const triesLeft = before.triesLeft == null ? null : before.triesLeft - 1;
+      return NextResponse.json({ ok: false, score, need: quiz.pass_score, triesLeft, locked: triesLeft === 0 });
+    }
+  }
 
   const { data: completion, error } = await db
     .from("completions")
@@ -79,26 +101,23 @@ export async function POST(req: NextRequest) {
     .upsert({ learner_id: learner.id, course_id: course.id, percent: 100, updated_at: new Date().toISOString() });
 
   await recordTimeAndTries(db, {
-    orgId: learner.org_id,
     learnerId: learner.id,
     courseId: course.id,
     completionId: completion.id,
-    score,
-    language,
-    roundStart: [item.lastFinishedAt, item.retakeAfter].filter(Boolean).sort().pop() ?? null,
+    roundStart: roundStartOf(item.lastFinishedAt, item.retakeAfter, item.completedAt),
   });
 
   return NextResponse.json({ ok: true, certificate: cert?.verify_code ?? null });
 }
 
 /**
- * Moves the time spent in this round onto the completion, counts the final
- * check tries it took, and logs the passing try. Best-effort: does nothing
- * until the time-and-tries database update has been run.
+ * Moves the time spent in this round onto the completion and records how many
+ * final-check tries it took (failed tries this round + this pass).
+ * Best-effort: does nothing until the time-and-tries database update has run.
  */
 async function recordTimeAndTries(
   db: ReturnType<typeof supabaseAdmin>,
-  o: { orgId: string; learnerId: string; courseId: string; completionId: string; score: number | null; language: string; roundStart: string | null },
+  o: { learnerId: string; courseId: string; completionId: string; roundStart: string | null },
 ) {
   const { data: prog, error } = await db
     .from("course_progress")
@@ -108,26 +127,18 @@ async function recordTimeAndTries(
     .maybeSingle();
   if (error) return; // columns not there yet
   let fails = db
-    .from("quiz_attempts")
+    .from("course_attempts")
     .select("id", { count: "exact", head: true })
     .eq("learner_id", o.learnerId)
     .eq("course_id", o.courseId)
-    .eq("passed", false);
-  if (o.roundStart) fails = fails.gt("attempted_at", o.roundStart);
+    .eq("kind", "attempt");
+  if (o.roundStart) fails = fails.gt("created_at", o.roundStart);
   const { count } = await fails;
   await Promise.all([
     db
       .from("completions")
       .update({ seconds_spent: prog?.seconds_spent || null, attempts: (count ?? 0) + 1 })
       .eq("id", o.completionId),
-    db.from("quiz_attempts").insert({
-      org_id: o.orgId,
-      learner_id: o.learnerId,
-      course_id: o.courseId,
-      score: o.score,
-      passed: true,
-      language: o.language,
-    }),
     db.from("course_progress").update({ seconds_spent: 0 }).eq("learner_id", o.learnerId).eq("course_id", o.courseId),
   ]);
 }

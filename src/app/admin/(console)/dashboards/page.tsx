@@ -8,7 +8,7 @@ export const metadata = { title: "STRATLEARN · Dashboards" };
 export default async function Dashboards({ searchParams }: { searchParams: Promise<Filter> }) {
   const f = await searchParams;
   const s = await requireStaff();
-  const team = await loadTeam(s.org.id);
+  const team = await loadTeam(s.org.id, s.locationIds);
   const d = await teamInsights(team, s.org.id, f);
   return <TeamDashboard orgName={s.org.name} roles={team.roles} locations={team.locations} d={d} f={f} />;
 }

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { logEvent, requireStaff } from "@/lib/staff";
+import { inScope, logEvent, requireStaff } from "@/lib/staff";
 import { STATUS_LABEL, isCurrent, repeatLabel } from "@/lib/status";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { statusRows, toCsv } from "../rows";
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   if (type === "completions") {
     const db = supabaseAdmin();
     const cols =
-      "completed_at, course_version, language, score, learners(display_name, username, employee_id), courses(slug, title), certificates(verify_code)";
+      "completed_at, course_version, language, score, learners(display_name, username, employee_id, location_id), courses(slug, title), certificates(verify_code, expires_at)";
     const query = (extra: string) =>
       db
         .from("completions")
@@ -36,14 +36,14 @@ export async function GET(req: NextRequest) {
       score: number | null;
       seconds_spent?: number | null;
       attempts?: number | null;
-      learners: { display_name: string; username: string; employee_id: string | null } | null;
+      learners: { display_name: string; username: string; employee_id: string | null; location_id: string | null } | null;
       courses: { slug: string; title: string } | null;
       certificates: { verify_code: string; expires_at: string | null }[] | { verify_code: string; expires_at: string | null } | null;
     };
     const origin = req.nextUrl.origin;
     csv = toCsv(
-      ["Name", "Sign-in name", "Employee ID", "Course", "Course ID", "Version", "Completed (UTC)", "Valid until", "Score", "Language", "Certificate code", "Verify link"],
-      ((data ?? []) as unknown as Row[]).map((r) => {
+      ["Name", "Sign-in name", "Employee ID", "Course", "Course ID", "Version", "Completed (UTC)", "Valid until", "Score", "Minutes spent", "Final-check tries", "Language", "Certificate code", "Verify link"],
+      ((data ?? []) as unknown as Row[]).filter((r) => inScope(s, r.learners?.location_id ?? null)).map((r) => {
         const cert = Array.isArray(r.certificates) ? r.certificates[0] : r.certificates;
         return [
           r.learners?.display_name,
@@ -65,32 +65,34 @@ export async function GET(req: NextRequest) {
     );
     name = `${team}-training-records-${stamp}.csv`;
   } else if (type === "tries") {
-    const { data } = await supabaseAdmin()
-      .from("quiz_attempts")
-      .select("attempted_at, score, passed, language, learners(display_name, username, employee_id), courses(slug, title)")
-      .eq("org_id", s.org.id)
-      .order("attempted_at", { ascending: false })
-      .limit(100000);
-    type Try = {
-      attempted_at: string;
-      score: number | null;
-      passed: boolean;
-      language: string | null;
-      learners: { display_name: string; username: string; employee_id: string | null } | null;
+    // Every final-check try: failed ones (course_attempts) and passes (completions).
+    const db = supabaseAdmin();
+    const who = "learners(display_name, username, employee_id, location_id), courses(slug, title)";
+    const [fails, passes] = await Promise.all([
+      db.from("course_attempts").select(`created_at, score, ${who}`).eq("org_id", s.org.id).eq("kind", "attempt").limit(100000),
+      db.from("completions").select(`completed_at, score, language, ${who}`).eq("org_id", s.org.id).limit(100000),
+    ]);
+    type Who = {
+      learners: { display_name: string; username: string; employee_id: string | null; location_id: string | null } | null;
       courses: { slug: string; title: string } | null;
     };
+    const rows = [
+      ...((fails.data ?? []) as unknown as (Who & { created_at: string; score: number | null })[]).map((r) => ({ ...r, at: r.created_at, passed: false })),
+      ...((passes.data ?? []) as unknown as (Who & { completed_at: string; score: number | null })[]).map((r) => ({ ...r, at: r.completed_at, passed: true })),
+    ]
+      .filter((r) => inScope(s, r.learners?.location_id ?? null))
+      .sort((a, b) => b.at.localeCompare(a.at));
     csv = toCsv(
-      ["Name", "Sign-in name", "Employee ID", "Course", "Course ID", "When (UTC)", "Score", "Result", "Language"],
-      ((data ?? []) as unknown as Try[]).map((r) => [
+      ["Name", "Sign-in name", "Employee ID", "Course", "Course ID", "When (UTC)", "Score", "Result"],
+      rows.map((r) => [
         r.learners?.display_name,
         r.learners?.username,
         r.learners?.employee_id,
         r.courses?.title,
         r.courses?.slug,
-        r.attempted_at.replace("T", " ").slice(0, 19),
+        r.at.replace("T", " ").slice(0, 19),
         r.score,
         r.passed ? "Passed" : "Not passed",
-        r.language,
       ]),
     );
     name = `${team}-quiz-tries-${stamp}.csv`;
@@ -114,7 +116,7 @@ export async function GET(req: NextRequest) {
       role: p.get("role") ?? undefined,
       location: p.get("location") ?? undefined,
       course: p.get("course") ?? undefined,
-    });
+    }, s.locationIds);
     csv = toCsv(
       ["Name", "Sign-in name", "Employee ID", "Role", "Location", "Course", "Status", "Compliant now", "Due / retrain by", "Last finished", "Version finished", "Score", "Repeats"],
       rows.map((r) => [

@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   const db = supabaseAdmin();
   const { data: learner } = await db
     .from("learners")
-    .select("id, org_id, display_name, preferred_language, job_role_id, location_id")
+    .select("id, org_id, display_name, preferred_language, job_role_id, location_id, start_date, created_at")
     .eq("id", session.lid)
     .eq("is_active", true)
     .maybeSingle();
@@ -31,16 +31,18 @@ export async function POST(req: NextRequest) {
   const courseId = item.course.id;
 
   if (body.failed) {
+    // The course's own final check was not passed: a failed try. Counts toward
+    // the team's try limit, like a score under the team's passing bar does.
     const score = typeof body.score === "number" && body.score >= 0 && body.score <= 100 ? Math.round(body.score) : null;
-    const { error } = await db.from("quiz_attempts").insert({
+    const { error } = await db.from("course_attempts").insert({
       org_id: learner.org_id,
       learner_id: learner.id,
       course_id: courseId,
+      course_version: item.course.version,
+      kind: "attempt",
       score,
-      passed: false,
-      language: body.lang === "es" ? "es" : "en",
     });
-    if (error) console.warn("quiz attempt not saved", error.message);
+    if (error) console.warn("failed try not saved", error.message);
   }
 
   // Never trust more than 2 minutes per update; the player sends every 30 seconds.

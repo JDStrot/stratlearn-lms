@@ -3,7 +3,7 @@ import { canManageTeam, requireStaff } from "@/lib/staff";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { removeGroup, removeStaff, startTablet } from "../../actions";
 import { PageHead } from "../../ui";
-import { AddGroup, AddStaff, LoginOptions, TeamForm } from "./forms";
+import { AddGroup, AddStaff, LoginOptions, StaffScope, TeamForm } from "./forms";
 
 export default async function Settings() {
   const s = await requireStaff();
@@ -12,7 +12,7 @@ export default async function Settings() {
   const [{ data: roles }, { data: locations }, { data: staff }] = await Promise.all([
     db.from("job_roles").select("id, name").eq("org_id", s.org.id).order("name"),
     db.from("locations").select("id, name").eq("org_id", s.org.id).order("name"),
-    db.from("staff_members").select("user_id, role, display_name").eq("org_id", s.org.id),
+    db.from("staff_members").select("user_id, role, display_name, location_ids").eq("org_id", s.org.id),
   ]);
   const { data: users } = admin ? await db.auth.admin.listUsers({ page: 1, perPage: 1000 }) : { data: null };
   const email = new Map((users?.users ?? []).map((u) => [u.id, u.email ?? ""]));
@@ -43,12 +43,22 @@ export default async function Settings() {
           )}
         </section>
 
-        <section className="card flex flex-col gap-3 p-6 lg:col-span-2 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="mb-1 text-3xl">Due dates &amp; <em>retraining</em></h2>
-            <p className="text-sm text-muted">Default due dates, grace days, and which courses repeat every year or two.</p>
+        <section className="card p-6 lg:col-span-2">
+          <h2 className="mb-4 text-3xl">Training <em>rules</em></h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              ["/admin/settings/retraining", "Due dates & retraining", "Default due days, grace days, which courses repeat every year or two."],
+              ["/admin/settings/states", "State rules", "Which state each location is in, and the state laws it needs."],
+              ["/admin/settings/reminders", "Reminders & records", "Nudges, telling managers about overdue training, record keeping, scheduled reports."],
+              ["/admin/settings/quizzes", "Quizzes & certificates", "Passing score, number of tries, your logo and signer on certificates."],
+              ["/admin/settings/documents", "Policies & plans", "Upload your own plans, like the Exposure Control Plan, for workers to read."],
+            ].map(([href, title, sub]) => (
+              <Link key={href} href={href} className="card card-hover flex flex-col gap-1 p-4 no-underline">
+                <span className="font-medium text-ink">{title}</span>
+                <span className="text-sm text-muted">{sub}</span>
+              </Link>
+            ))}
           </div>
-          <Link href="/admin/settings/retraining" className="btn btn-primary btn-sm self-start">Open</Link>
         </section>
 
         {(["role", "location"] as const).map((kind) => {
@@ -90,6 +100,9 @@ export default async function Settings() {
                 <span>
                   <span className="font-medium">{m.display_name || email.get(m.user_id) || "Manager"}</span>
                   <span className="block text-sm text-muted">{email.get(m.user_id)}</span>
+                  {admin && m.role === "manager" && (locations ?? []).length > 0 && (
+                    <StaffScope userId={m.user_id} locations={locations ?? []} on={(m.location_ids as string[] | null) ?? []} />
+                  )}
                 </span>
                 <span className="flex items-center gap-3">
                   <span className="chip">{m.role}</span>
@@ -103,7 +116,7 @@ export default async function Settings() {
               </li>
             ))}
           </ul>
-          {admin && <AddStaff />}
+          {admin && <AddStaff locations={locations ?? []} />}
         </section>
       </div>
     </>

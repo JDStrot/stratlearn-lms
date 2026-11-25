@@ -10,6 +10,7 @@ import {
   DEFAULT_LOGIN_SETTINGS,
   ORG_COOKIE,
   canManageTeam,
+  inScope,
   logEvent,
   normalizePhone,
   randomPin,
@@ -164,6 +165,7 @@ export async function addPeople(_p: AddState, f: FormData): Promise<AddState> {
         findOrMake("job_roles", s.org.id, r.role ?? null),
         findOrMake("locations", s.org.id, r.location ?? null),
       ]);
+      if (!inScope(s, location_id)) throw new Error(`${r.name}: pick one of your locations`);
       const { data, error } = await db
         .from("learners")
         .insert({
@@ -197,11 +199,11 @@ export async function addPeople(_p: AddState, f: FormData): Promise<AddState> {
 async function ownPerson(s: Staff, id: string) {
   const { data } = await supabaseAdmin()
     .from("learners")
-    .select("id, display_name, username")
+    .select("id, display_name, username, location_id")
     .eq("id", id)
     .eq("org_id", s.org.id)
     .maybeSingle();
-  if (!data) throw new Error("Not on this team.");
+  if (!data || !inScope(s, data.location_id)) throw new Error("Not on this team.");
   return data;
 }
 
@@ -219,6 +221,9 @@ export async function updatePerson(_p: FormState, f: FormData): Promise<FormStat
     findOrMake("job_roles", s.org.id, opt(f, "role")),
     findOrMake("locations", s.org.id, opt(f, "location")),
   ]);
+  if (!inScope(s, location_id)) return { error: "Pick one of your locations." };
+  const startDate = opt(f, "startDate");
+  if (startDate && !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) return { error: "Start date doesn't look right." };
   const { error } = await supabaseAdmin()
     .from("learners")
     .update({
@@ -230,6 +235,7 @@ export async function updatePerson(_p: FormState, f: FormData): Promise<FormStat
       preferred_language: str(f, "language") === "es" ? "es" : "en",
       job_role_id,
       location_id,
+      start_date: startDate,
     })
     .eq("id", id)
     .eq("org_id", s.org.id);
@@ -324,6 +330,19 @@ export async function assignTraining(_p: FormState, f: FormData): Promise<FormSt
     if (kind === "location") target.location_id = targetId;
     if (kind === "person") target.learner_id = targetId;
   }
+  const dueWithin = !target.learner_id && /^\d+$/.test(dueDays) ? Number(dueDays) : null;
+  // Managers limited to some locations assign to those locations or their people.
+  if (s.locationIds) {
+    if (kind === "person") {
+      try {
+        await ownPerson(s, targetId);
+      } catch {
+        return { error: "Choose someone at your locations." };
+      }
+    } else if (!(kind === "location" && s.locationIds.includes(targetId))) {
+      return { error: "Choose one of your locations or one person." };
+    }
+  }
 
   const [wkind, wid, wpath] = what.split(":");
   let courseIds: string[] = [];
@@ -380,6 +399,8 @@ export async function assignTraining(_p: FormState, f: FormData): Promise<FormSt
       course_id,
       ...target,
       due_at,
+      // Group assignments: everyone (and every new hire) gets the same number of days.
+      due_within_days: dueWithin,
       recurrence_months: repeatCustom ? repeat : null,
       ...(repeatCustom ? { recurrence_custom: true } : {}),
       ...(retake ? { retake_after: now } : {}),
@@ -395,7 +416,7 @@ export async function assignTraining(_p: FormState, f: FormData): Promise<FormSt
   if (updateIds.length && (retake || repeatCustom)) {
     const { error } = await db
       .from("assignments")
-      .update({ ...(retake ? { retake_after: now, due_at } : {}), ...repeatCols })
+      .update({ ...(retake ? { retake_after: now, due_at, due_within_days: dueWithin } : {}), ...repeatCols })
       .in("id", updateIds);
     if (error) return { error: friendlyDbError(error.message) };
   }
@@ -442,6 +463,14 @@ export async function removeAssignment(f: FormData) {
   const db = supabaseAdmin();
   const ids = str(f, "ids").split(",").filter(Boolean);
   if (!ids.length) return;
+  if (s.locationIds) {
+    // Limited managers can only remove what they could have assigned.
+    const { data: rows } = await db.from("assignments").select("learner_id, job_role_id, location_id").eq("org_id", s.org.id).in("id", ids);
+    for (const a of rows ?? []) {
+      if (a.learner_id) await ownPerson(s, a.learner_id);
+      else if (a.job_role_id || !a.location_id || !s.locationIds.includes(a.location_id)) throw new Error("Only your locations.");
+    }
+  }
   await db.from("assignments").delete().eq("org_id", s.org.id).in("id", ids);
   await logEvent(s, "unassign", { assignment_ids: ids });
   revalidatePath("/admin", "layout");
@@ -529,7 +558,10 @@ export async function addStaff(_p: StaffState, f: FormData): Promise<StaffState>
   }
   const { error } = await db
     .from("staff_members")
-    .upsert({ user_id: userId, org_id: s.org.id, role, display_name: opt(f, "name") }, { onConflict: "user_id,org_id" });
+    .upsert(
+      { user_id: userId, org_id: s.org.id, role, display_name: opt(f, "name"), location_ids: role === "manager" ? await ownLocations(s, f) : null },
+      { onConflict: "user_id,org_id" },
+    );
   if (error) return { error: error.message };
   await logEvent(s, "staff.add", { email, role });
   revalidatePath("/admin/settings");
@@ -537,6 +569,32 @@ export async function addStaff(_p: StaffState, f: FormData): Promise<StaffState>
     ok: password ? `Account made for ${email}.` : `${email} already had an account and can now see this team.`,
     password,
   };
+}
+
+/** Location ids ticked on a form, checked against this team. Empty = whole team (null). */
+async function ownLocations(s: Staff, f: FormData) {
+  const ids = f.getAll("locations").map(String).filter(Boolean);
+  if (!ids.length) return null;
+  const { data } = await supabaseAdmin().from("locations").select("id").eq("org_id", s.org.id).in("id", ids);
+  const ok = (data ?? []).map((l) => l.id as string);
+  return ok.length ? ok : null;
+}
+
+/** Limits a manager to some locations (or the whole team). */
+export async function setStaffScope(_p: FormState, f: FormData): Promise<FormState> {
+  const s = await requireTeamAdmin();
+  const userId = str(f, "userId");
+  const location_ids = await ownLocations(s, f);
+  const { error } = await supabaseAdmin()
+    .from("staff_members")
+    .update({ location_ids })
+    .eq("user_id", userId)
+    .eq("org_id", s.org.id)
+    .eq("role", "manager");
+  if (error) return { error: error.message };
+  await logEvent(s, "staff.scope", { user_id: userId, locations: location_ids?.length ?? "all" });
+  revalidatePath("/admin/settings");
+  return { ok: "Saved." };
 }
 
 export async function removeStaff(f: FormData) {
@@ -684,6 +742,22 @@ export async function saveCourseRule(_p: FormState, f: FormData): Promise<FormSt
   }
   if (error) return { error: dbUpdateMissing(error.message) };
   await logEvent(s, "settings.retraining", { course: course.title, repeat: value || "course default" });
+  revalidatePath("/admin", "layout");
+  return { ok: "Saved." };
+}
+
+/** Which state (and city) a location is in, for State rules. */
+export async function saveLocationPlace(_p: FormState, f: FormData): Promise<FormState> {
+  const s = await requireTeamAdmin();
+  const state = str(f, "state").toUpperCase() || null;
+  if (state && !/^[A-Z]{2}$/.test(state)) return { error: "Pick a state." };
+  const { error } = await supabaseAdmin()
+    .from("locations")
+    .update({ state, city: opt(f, "city") })
+    .eq("id", str(f, "id"))
+    .eq("org_id", s.org.id);
+  if (error) return { error: error.message };
+  await logEvent(s, "location.place", { id: str(f, "id"), state });
   revalidatePath("/admin", "layout");
   return { ok: "Saved." };
 }

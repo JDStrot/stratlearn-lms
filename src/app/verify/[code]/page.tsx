@@ -1,6 +1,8 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { readCertificate } from "@/lib/org-settings";
+import { PrintButton } from "@/app/admin/(console)/badges/print-tools";
 
 /** Public page that confirms a certificate is real: /verify/<code>. */
 export default async function VerifyPage({ params }: { params: Promise<{ code: string }> }) {
@@ -8,11 +10,12 @@ export default async function VerifyPage({ params }: { params: Promise<{ code: s
   const clean = code.toUpperCase().replace(/[^A-F0-9]/g, "");
   const { data } = await supabaseAdmin()
     .from("certificates")
-    .select("issued_at, expires_at, learners(display_name), courses(title), organizations(name), completions(course_version)")
+    .select("issued_at, expires_at, learners(display_name), courses(title), org_id, organizations(name, certificate_settings), completions(course_version)")
     .eq("verify_code", clean)
     .maybeSingle();
 
   const one = <T,>(v: T | T[] | null | undefined): T | undefined => (Array.isArray(v) ? v[0] : (v ?? undefined));
+  const brand = readCertificate(one(data?.organizations as { certificate_settings?: unknown } | undefined)?.certificate_settings);
 
   return (
     <>
@@ -21,7 +24,12 @@ export default async function VerifyPage({ params }: { params: Promise<{ code: s
       <section className="card mx-auto w-[calc(100%-32px)] max-w-md p-8 text-center shadow-soft">
         {data ? (
           <>
-            <p aria-hidden className="text-4xl text-lilac">✦</p>
+            {brand.logo_path ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={`/api/org-logo/${data.org_id}`} alt={one(data.organizations)?.name ?? "Company logo"} className="mx-auto mb-2 h-16 max-w-[220px] object-contain" />
+            ) : (
+              <p aria-hidden className="text-4xl text-lilac">✦</p>
+            )}
             <p className="eyebrow mt-2">Certificate check</p>
             <h1 className="mt-2 text-4xl">
               Certificate <em>verified</em>
@@ -36,6 +44,15 @@ export default async function VerifyPage({ params }: { params: Promise<{ code: s
               {one(data.organizations)?.name} · {new Date(data.issued_at).toLocaleDateString("en-US")}
               {data.expires_at ? ` · valid until ${new Date(data.expires_at).toLocaleDateString("en-US")}` : ""}
             </p>
+            {brand.signer_name && (
+              <p className="mt-6 border-t border-line pt-3 text-sm">
+                <span className="block font-serif text-xl text-plum">{brand.signer_name}</span>
+                {brand.signer_title && <span className="text-muted">{brand.signer_title}</span>}
+              </p>
+            )}
+            <div className="mt-6 print:hidden">
+              <PrintButton />
+            </div>
           </>
         ) : (
           <>

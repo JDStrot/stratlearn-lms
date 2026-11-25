@@ -9,7 +9,7 @@ import { AssignForm } from "./assign-form";
 export default async function AssignPage({ searchParams }: { searchParams: Promise<{ who?: string }> }) {
   const { who } = await searchParams;
   const s = await requireStaff();
-  const [team, packs] = await Promise.all([loadTeam(s.org.id), loadPacks(s.org.id)]);
+  const [team, packs] = await Promise.all([loadTeam(s.org.id, s.locationIds), loadPacks(s.org.id)]);
   const courseTitle = new Map(team.courses.map((c) => [c.id, c.title]));
   const packTitle = new Map(packs.map((p) => [p.id, p.title]));
 
@@ -62,6 +62,7 @@ export default async function AssignPage({ searchParams }: { searchParams: Promi
         locations={team.locations}
         people={team.people.filter((p) => p.is_active).map((p) => ({ id: p.id, name: p.display_name }))}
         defaultDueDays={team.rules.settings.default_due_days}
+        limited={!!s.locationIds}
       />
 
       <section className="card mt-8 overflow-x-auto">
