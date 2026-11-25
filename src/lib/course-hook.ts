@@ -14,6 +14,10 @@ import "server-only";
  *    player around it, which records the completion, certificate and badge.
  *    If a pass was saved but never reached the app (signal lost), it is sent
  *    again the next time the course opens.
+ * 3. Tells the app about each failed final check. Every Lottie course shows a
+ *    "Try again" button (id="again") under "You got X of Y" when the final
+ *    check is not passed; the script spots it and sends "stratlearn:try" with
+ *    that score, so managers can see how many tries a course took.
  */
 export function courseHook(opts: {
   learnerId: string;
@@ -44,6 +48,12 @@ proto.removeItem=function(k){return r.call(this,mine(this)?P+k:k)};
 proto.setItem=function(k,v){
   if(mine(this)&&!sent){var n=parse(v);if(n&&n.passed===true){var o=parse(g.call(this,P+k));if(!(o&&o.passed===true))report(n)}}
   return s.call(this,mine(this)?P+k:k,v)};
+if(!DONE&&window.MutationObserver){var seen=[];new MutationObserver(function(){
+  var b=document.getElementById("again");if(!b||seen.indexOf(b)>=0)return;seen.push(b);
+  var w=b.closest(".band"),q=w&&w.querySelector(".sub"),t=q?q.textContent||"":"",m=t.match(/(\\d+)\\D+?(\\d+)/),sc;
+  if(m&&+m[2]>0)sc=Math.round(+m[1]/+m[2]*100);
+  try{window.parent.postMessage({type:"stratlearn:try",score:sc,lang:window.LOTTIE_LANG||"en"},location.origin)}catch(e){}
+}).observe(document.documentElement,{childList:true,subtree:true})}
 if(!DONE){try{for(var i=0;i<ls.length;i++){var k=ls.key(i);if(k&&k.indexOf(P)===0){var o=parse(g.call(ls,k));
   if(o&&o.passed===true){var st=o;setTimeout(function(){report(st)},1500);break}}}}catch(e){}}
 })();`;

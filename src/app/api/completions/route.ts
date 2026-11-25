@@ -78,5 +78,56 @@ export async function POST(req: NextRequest) {
     .from("course_progress")
     .upsert({ learner_id: learner.id, course_id: course.id, percent: 100, updated_at: new Date().toISOString() });
 
+  await recordTimeAndTries(db, {
+    orgId: learner.org_id,
+    learnerId: learner.id,
+    courseId: course.id,
+    completionId: completion.id,
+    score,
+    language,
+    roundStart: [item.lastFinishedAt, item.retakeAfter].filter(Boolean).sort().pop() ?? null,
+  });
+
   return NextResponse.json({ ok: true, certificate: cert?.verify_code ?? null });
+}
+
+/**
+ * Moves the time spent in this round onto the completion, counts the final
+ * check tries it took, and logs the passing try. Best-effort: does nothing
+ * until the time-and-tries database update has been run.
+ */
+async function recordTimeAndTries(
+  db: ReturnType<typeof supabaseAdmin>,
+  o: { orgId: string; learnerId: string; courseId: string; completionId: string; score: number | null; language: string; roundStart: string | null },
+) {
+  const { data: prog, error } = await db
+    .from("course_progress")
+    .select("seconds_spent")
+    .eq("learner_id", o.learnerId)
+    .eq("course_id", o.courseId)
+    .maybeSingle();
+  if (error) return; // columns not there yet
+  let fails = db
+    .from("quiz_attempts")
+    .select("id", { count: "exact", head: true })
+    .eq("learner_id", o.learnerId)
+    .eq("course_id", o.courseId)
+    .eq("passed", false);
+  if (o.roundStart) fails = fails.gt("attempted_at", o.roundStart);
+  const { count } = await fails;
+  await Promise.all([
+    db
+      .from("completions")
+      .update({ seconds_spent: prog?.seconds_spent || null, attempts: (count ?? 0) + 1 })
+      .eq("id", o.completionId),
+    db.from("quiz_attempts").insert({
+      org_id: o.orgId,
+      learner_id: o.learnerId,
+      course_id: o.courseId,
+      score: o.score,
+      passed: true,
+      language: o.language,
+    }),
+    db.from("course_progress").update({ seconds_spent: 0 }).eq("learner_id", o.learnerId).eq("course_id", o.courseId),
+  ]);
 }

@@ -18,14 +18,18 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
         <a href={`/admin/reports/export?type=status&${qs}`} className="btn btn-primary btn-sm">Download this view (CSV)</a>
       </PageHead>
 
-      <section className="card mb-6 grid gap-4 p-6 md:grid-cols-3">
+      <section className="card mb-6 grid gap-4 p-6 md:grid-cols-2 lg:grid-cols-4">
         <div>
           <h2 className="text-2xl">Audit <em>records</em></h2>
           <p className="text-sm text-muted">For inspectors, insurers and lawyers. Opens in Excel or Google Sheets.</p>
         </div>
         <a href="/admin/reports/export?type=completions" className="card card-hover flex flex-col gap-1 p-4 no-underline">
           <span className="font-medium text-ink">Training records</span>
-          <span className="text-sm text-muted">Every completion: date, course version, score, language and certificate code.</span>
+          <span className="text-sm text-muted">Every completion: date, course version, score, minutes spent, tries, language and certificate code.</span>
+        </a>
+        <a href="/admin/reports/export?type=tries" className="card card-hover flex flex-col gap-1 p-4 no-underline">
+          <span className="font-medium text-ink">Quiz tries</span>
+          <span className="text-sm text-muted">Every final-check try: date, score and whether it passed.</span>
         </a>
         <a href="/admin/reports/export?type=activity" className="card card-hover flex flex-col gap-1 p-4 no-underline">
           <span className="font-medium text-ink">Manager activity log</span>

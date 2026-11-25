@@ -17,19 +17,25 @@ export async function GET(req: NextRequest) {
 
   if (type === "completions") {
     const db = supabaseAdmin();
-    const { data } = await db
-      .from("completions")
-      .select(
-        "completed_at, course_version, language, score, learners(display_name, username, employee_id), courses(slug, title), certificates(verify_code, expires_at)",
-      )
-      .eq("org_id", s.org.id)
-      .order("completed_at", { ascending: false })
-      .limit(100000);
+    const cols =
+      "completed_at, course_version, language, score, learners(display_name, username, employee_id), courses(slug, title), certificates(verify_code)";
+    const query = (extra: string) =>
+      db
+        .from("completions")
+        .select(cols + extra)
+        .eq("org_id", s.org.id)
+        .order("completed_at", { ascending: false })
+        .limit(100000);
+    // Time and tries columns exist once the time-and-tries database update has run.
+    const full = await query(", seconds_spent, attempts");
+    const data = full.error ? (await query("")).data : full.data;
     type Row = {
       completed_at: string;
       course_version: number;
       language: string | null;
       score: number | null;
+      seconds_spent?: number | null;
+      attempts?: number | null;
       learners: { display_name: string; username: string; employee_id: string | null } | null;
       courses: { slug: string; title: string } | null;
       certificates: { verify_code: string; expires_at: string | null }[] | { verify_code: string; expires_at: string | null } | null;
@@ -49,6 +55,8 @@ export async function GET(req: NextRequest) {
           r.completed_at.replace("T", " ").slice(0, 19),
           day(cert?.expires_at),
           r.score,
+          r.seconds_spent ? Math.round(r.seconds_spent / 6) / 10 : "",
+          r.attempts ?? "",
           r.language,
           cert?.verify_code,
           cert ? `${origin}/verify/${cert.verify_code}` : "",
@@ -56,6 +64,36 @@ export async function GET(req: NextRequest) {
       }),
     );
     name = `${team}-training-records-${stamp}.csv`;
+  } else if (type === "tries") {
+    const { data } = await supabaseAdmin()
+      .from("quiz_attempts")
+      .select("attempted_at, score, passed, language, learners(display_name, username, employee_id), courses(slug, title)")
+      .eq("org_id", s.org.id)
+      .order("attempted_at", { ascending: false })
+      .limit(100000);
+    type Try = {
+      attempted_at: string;
+      score: number | null;
+      passed: boolean;
+      language: string | null;
+      learners: { display_name: string; username: string; employee_id: string | null } | null;
+      courses: { slug: string; title: string } | null;
+    };
+    csv = toCsv(
+      ["Name", "Sign-in name", "Employee ID", "Course", "Course ID", "When (UTC)", "Score", "Result", "Language"],
+      ((data ?? []) as unknown as Try[]).map((r) => [
+        r.learners?.display_name,
+        r.learners?.username,
+        r.learners?.employee_id,
+        r.courses?.title,
+        r.courses?.slug,
+        r.attempted_at.replace("T", " ").slice(0, 19),
+        r.score,
+        r.passed ? "Passed" : "Not passed",
+        r.language,
+      ]),
+    );
+    name = `${team}-quiz-tries-${stamp}.csv`;
   } else if (type === "activity") {
     const { data } = await supabaseAdmin()
       .from("admin_events")

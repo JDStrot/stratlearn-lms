@@ -77,27 +77,59 @@ export async function loadProgress(learnerIds: string[]) {
   return out;
 }
 
-/** Completions with the extra columns the dashboards use (language). */
-async function loadLanguages(orgId: string) {
-  const { data } = await supabaseAdmin()
+/** Completions with the extra columns the dashboards use (language, time, tries). */
+async function loadLanguages(orgId: string): Promise<{ rows: LangRow[]; tracking: boolean }> {
+  const db = supabaseAdmin();
+  const full = await db
+    .from("completions")
+    .select("learner_id, course_id, completed_at, language, seconds_spent, attempts")
+    .eq("org_id", orgId)
+    .limit(50000);
+  if (!full.error) return { rows: (full.data ?? []) as LangRow[], tracking: true };
+  // Time-and-tries database update not run yet.
+  const { data } = await db
     .from("completions")
     .select("learner_id, course_id, completed_at, language")
     .eq("org_id", orgId)
     .limit(50000);
-  return (data ?? []) as LangRow[];
+  return { rows: (data ?? []) as LangRow[], tracking: false };
+}
+
+async function loadTries(orgId: string): Promise<TryRow[]> {
+  const { data, error } = await supabaseAdmin()
+    .from("quiz_attempts")
+    .select("learner_id, course_id, score, passed, attempted_at")
+    .eq("org_id", orgId)
+    .limit(100000);
+  return error ? [] : ((data ?? []) as TryRow[]);
 }
 
 export async function teamInsights(team: Team, orgId: string, f: Filter, now = new Date()) {
   const ids = teamStatus(team).map((r) => r.person.id);
-  const [progress, langs] = await Promise.all([loadProgress(ids), loadLanguages(orgId)]);
-  return computeInsights(team, f, progress, langs, now);
+  const [progress, langs, tries] = await Promise.all([loadProgress(ids), loadLanguages(orgId), loadTries(orgId)]);
+  return computeInsights(team, f, progress, langs.rows, now, { tries, tracking: langs.tracking });
 }
 
 type ProgressRow = { learner_id: string; course_id: string; percent: number; updated_at: string };
-type LangRow = { learner_id: string; course_id: string; completed_at: string; language: string | null };
+type LangRow = {
+  learner_id: string;
+  course_id: string;
+  completed_at: string;
+  language: string | null;
+  seconds_spent?: number | null;
+  attempts?: number | null;
+};
+type TryRow = { learner_id: string; course_id: string; score: number | null; passed: boolean; attempted_at: string };
 
 /** Pure part: no database calls, so it can be tested with sample data. */
-export function computeInsights(team: Team, f: Filter, allProgress: ProgressRow[], langs: LangRow[], now = new Date()) {
+export function computeInsights(
+  team: Team,
+  f: Filter,
+  allProgress: ProgressRow[],
+  langs: LangRow[],
+  now = new Date(),
+  extra: { tries: TryRow[]; tracking: boolean } = { tries: [], tracking: false },
+) {
   const range = toRange(f.range);
   const keep = (p: Person) =>
     (!f.role || p.job_role_id === f.role) && (!f.location || p.location_id === f.location);
@@ -249,7 +281,56 @@ export function computeInsights(team: Team, f: Filter, allProgress: ProgressRow[
   const inProgress = progress.filter((p) => p.percent > 0 && p.percent < 100).length;
   const allClear = rows.filter((r) => r.statuses.length && r.statuses.every((s) => isCurrent(bucketOf(s.status)))).length;
 
+  // Time spent and final-check tries (recorded once the database update has run).
+  const inRange = langs.filter((c) => ids.has(c.learner_id) && new Date(c.completed_at).getTime() >= since);
+  const timed = inRange.filter((c) => c.seconds_spent);
+  const tried = inRange.filter((c) => c.attempts);
+  const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+  const tries = extra.tries.filter((t) => ids.has(t.learner_id) && new Date(t.attempted_at).getTime() >= since);
+  const scoreBands = [
+    { label: "Under 60", long: "Scores under 60%", lo: 0, hi: 59 },
+    { label: "60s", long: "Scores 60–69%", lo: 60, hi: 69 },
+    { label: "70s", long: "Scores 70–79%", lo: 70, hi: 79 },
+    { label: "80s", long: "Scores 80–89%", lo: 80, hi: 89 },
+    { label: "90+", long: "Scores 90–100%", lo: 90, hi: 100 },
+  ].map((b) => ({ ...b, value: tries.filter((t) => t.score != null && t.score >= b.lo && t.score <= b.hi).length }));
+  const triesDist = [1, 2, 3, 4].map((n) => ({
+    label: n === 4 ? "4+" : String(n),
+    long: n === 1 ? "Passed on the first try" : n === 4 ? "Took 4 or more tries" : `Took ${n} tries`,
+    value: tried.filter((c) => (n === 4 ? (c.attempts as number) >= 4 : c.attempts === n)).length,
+  }));
+  const perCourse = new Map<string, { secs: number[]; tries: number[] }>();
+  for (const c of inRange) {
+    const v = perCourse.get(c.course_id) ?? { secs: [], tries: [] };
+    if (c.seconds_spent) v.secs.push(c.seconds_spent);
+    if (c.attempts) v.tries.push(c.attempts);
+    perCourse.set(c.course_id, v);
+  }
+  const learning = {
+    tracking: extra.tracking,
+    avgMinutes: timed.length ? Math.round((avg(timed.map((c) => c.seconds_spent as number)) as number) / 60) : null,
+    totalHours: Math.round(timed.reduce((a, c) => a + (c.seconds_spent as number), 0) / 360) / 10,
+    timedCount: timed.length,
+    avgTries: tried.length ? Math.round((avg(tried.map((c) => c.attempts as number)) as number) * 10) / 10 : null,
+    firstTryPct: tried.length ? Math.round((tried.filter((c) => c.attempts === 1).length / tried.length) * 100) : null,
+    triedCount: tried.length,
+    failedTries: tries.filter((t) => !t.passed).length,
+    scoreBands,
+    triesDist,
+    byCourse: Object.fromEntries(
+      [...perCourse].map(([id, v]) => [
+        id,
+        {
+          minutes: v.secs.length ? Math.round((avg(v.secs) as number) / 60) : null,
+          tries: v.tries.length ? Math.round((avg(v.tries) as number) * 10) / 10 : null,
+          firstTryPct: v.tries.length ? Math.round((v.tries.filter((t) => t === 1).length / v.tries.length) * 100) : null,
+        },
+      ]),
+    ) as Record<string, { minutes: number | null; tries: number | null; firstTryPct: number | null }>,
+  };
+
   return {
+    learning,
     range,
     mix,
     assigned,
