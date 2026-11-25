@@ -15,6 +15,7 @@ export async function statusRows(orgId: string, f: ReportFilter, locationIds: st
     employeeId: string;
     role: string;
     location: string;
+    locationId: string | null;
     courseId: string;
     course: string;
     status: Status;
@@ -41,6 +42,7 @@ export async function statusRows(orgId: string, f: ReportFilter, locationIds: st
         employeeId: person.employee_id ?? "",
         role: nameOf(team.roles, person.job_role_id),
         location: nameOf(team.locations, person.location_id),
+        locationId: person.location_id,
         courseId: st.courseId,
         course: course.get(st.courseId) ?? "",
         status: st.status,

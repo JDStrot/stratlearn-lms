@@ -128,6 +128,7 @@ export async function saveRecords(_p: FormState, f: FormData): Promise<FormState
     export_emails: emails.slice(0, 10),
     last_export_at: current.last_export_at,
     time_zone: validTz(str(f, "timeZone")) ?? current.time_zone ?? DEFAULT_TZ,
+    location_time_zones: current.location_time_zones,
   });
 }
 

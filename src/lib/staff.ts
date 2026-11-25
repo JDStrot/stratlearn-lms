@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { supabaseAdmin } from "./supabase/admin";
 import { supabaseServer } from "./supabase/server";
 import { DEFAULT_TZ, validTz } from "./time-zones";
-import { setTeamTz } from "./team-time";
+import { locationZones, setTeamTz } from "./team-time";
 
 export type LoginSettings = {
   pin: boolean;
@@ -98,6 +98,13 @@ export async function requireStaff(): Promise<Staff> {
   org.login_settings = { ...DEFAULT_LOGIN_SETTINGS, ...(org.login_settings ?? {}) };
   org.time_zone = validTz(org.records_settings?.time_zone) ?? DEFAULT_TZ;
   setTeamTz(org.time_zone);
+  // A manager limited to locations in one time zone sees that zone.
+  const limited = m.role === "manager" ? m.locationIds : null;
+  if (limited?.length) {
+    const { zoneOf } = await locationZones(org.id);
+    const zones = new Set(limited.map((id) => zoneOf(id)));
+    if (zones.size === 1) setTeamTz([...zones][0]);
+  }
 
   return {
     userId: user.id,

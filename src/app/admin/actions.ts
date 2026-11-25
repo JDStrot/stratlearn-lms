@@ -1,5 +1,7 @@
 "use server";
 
+import { readLocationZones } from "@/lib/team-time";
+import { validTz } from "@/lib/time-zones";
 import { cookies } from "next/headers";
 import { siteOrigin } from "@/lib/origin";
 import { redirect } from "next/navigation";
@@ -751,13 +753,24 @@ export async function saveLocationPlace(_p: FormState, f: FormData): Promise<For
   const s = await requireTeamAdmin();
   const state = str(f, "state").toUpperCase() || null;
   if (state && !/^[A-Z]{2}$/.test(state)) return { error: "Pick a state." };
+  const id = str(f, "id");
   const { error } = await supabaseAdmin()
     .from("locations")
     .update({ state, city: opt(f, "city") })
-    .eq("id", str(f, "id"))
+    .eq("id", id)
     .eq("org_id", s.org.id);
   if (error) return { error: error.message };
-  await logEvent(s, "location.place", { id: str(f, "id"), state });
+  // Time zone picked by hand ("" = use the state's zone), kept with the record settings.
+  const db = supabaseAdmin();
+  const { data: org } = await db.from("organizations").select("records_settings").eq("id", s.org.id).maybeSingle();
+  const rec = (org?.records_settings ?? {}) as Record<string, unknown>;
+  const zones = readLocationZones(rec.location_time_zones);
+  const tz = validTz(str(f, "timeZone"));
+  if (tz) zones[id] = tz;
+  else delete zones[id];
+  const saved = await db.from("organizations").update({ records_settings: { ...rec, location_time_zones: zones } }).eq("id", s.org.id);
+  if (saved.error) return { error: saved.error.message };
+  await logEvent(s, "location.place", { id, state, time_zone: tz ?? "from state" });
   revalidatePath("/admin", "layout");
   return { ok: "Saved." };
 }
