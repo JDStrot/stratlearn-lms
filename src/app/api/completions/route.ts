@@ -100,5 +100,45 @@ export async function POST(req: NextRequest) {
     .from("course_progress")
     .upsert({ learner_id: learner.id, course_id: course.id, percent: 100, updated_at: new Date().toISOString() });
 
+  await recordTimeAndTries(db, {
+    learnerId: learner.id,
+    courseId: course.id,
+    completionId: completion.id,
+    roundStart: roundStartOf(item.lastFinishedAt, item.retakeAfter, item.completedAt),
+  });
+
   return NextResponse.json({ ok: true, certificate: cert?.verify_code ?? null });
+}
+
+/**
+ * Moves the time spent in this round onto the completion and records how many
+ * final-check tries it took (failed tries this round + this pass).
+ * Best-effort: does nothing until the time-and-tries database update has run.
+ */
+async function recordTimeAndTries(
+  db: ReturnType<typeof supabaseAdmin>,
+  o: { learnerId: string; courseId: string; completionId: string; roundStart: string | null },
+) {
+  const { data: prog, error } = await db
+    .from("course_progress")
+    .select("seconds_spent")
+    .eq("learner_id", o.learnerId)
+    .eq("course_id", o.courseId)
+    .maybeSingle();
+  if (error) return; // columns not there yet
+  let fails = db
+    .from("course_attempts")
+    .select("id", { count: "exact", head: true })
+    .eq("learner_id", o.learnerId)
+    .eq("course_id", o.courseId)
+    .eq("kind", "attempt");
+  if (o.roundStart) fails = fails.gt("created_at", o.roundStart);
+  const { count } = await fails;
+  await Promise.all([
+    db
+      .from("completions")
+      .update({ seconds_spent: prog?.seconds_spent || null, attempts: (count ?? 0) + 1 })
+      .eq("id", o.completionId),
+    db.from("course_progress").update({ seconds_spent: 0 }).eq("learner_id", o.learnerId).eq("course_id", o.courseId),
+  ]);
 }

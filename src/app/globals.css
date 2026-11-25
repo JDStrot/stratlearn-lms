@@ -582,4 +582,22 @@ a {
   .viz-tip {
     display: none;
   }
+  /* Two charts side by side on paper, four headline numbers in a row. */
+  .viz-root > .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+    margin-top: 12px !important;
+  }
+  .viz-root > .grid.lg\:grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+  .viz-root > .grid > .flex-col {
+    gap: 12px !important;
+  }
+  .viz-root .viz-panel {
+    padding: 14px !important;
+  }
+  .viz-root .viz-cols {
+    height: 170px;
+  }
 }

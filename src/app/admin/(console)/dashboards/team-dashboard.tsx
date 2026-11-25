@@ -4,6 +4,7 @@ import { PageHead } from "../../ui";
 import { RANGES, type Filter, type Range, type TeamInsights } from "../../insights";
 import { BUCKET, BUCKET_ORDER, BarRows, Columns, Donut, Empty, Heatmap, Kpi, Panel, PercentLine, SplitBar, StackRows } from "../../charts";
 import { PrintSnapshot } from "../../print-button";
+import { LearningPanels, mins } from "../../learning-panels";
 
 /** The manager Dashboards page body (data in, charts out). */
 export function TeamDashboard({ orgName, roles, locations, d, f }: { orgName: string; roles: Named[]; locations: Named[]; d: TeamInsights; f: Filter }) {
@@ -31,7 +32,7 @@ export function TeamDashboard({ orgName, roles, locations, d, f }: { orgName: st
   const langTotal = d.langCount.en + d.langCount.es;
 
   return (
-    <>
+    <div className="viz-root">
       <div className="print-only mb-6 border-b border-line pb-4">
         <p className="eyebrow">STRATLEARN training snapshot</p>
         <p className="mt-1 font-serif text-3xl text-plum">{s.org.name}</p>
@@ -127,12 +128,14 @@ export function TeamDashboard({ orgName, roles, locations, d, f }: { orgName: st
         </Panel>
       </div>
 
+      <LearningPanels l={d.learning} unitNote={`in the ${RANGES[d.range as Range].toLowerCase()}`} />
+
       <Panel className="mt-6" title={<>Compliance <em>map</em></>} sub="Percent of people done with each course, at each location. Deeper purple means more people are done.">
         {d.grid.rows.length ? <Heatmap cols={d.grid.cols} rows={d.grid.rows} /> : <Empty>Assign training to see this map.</Empty>}
       </Panel>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1.35fr_1fr]">
-        <Panel title={<>Courses at a <em>glance</em></>} sub="Most finished in this time, with average quiz score.">
+        <Panel title={<>Courses at a <em>glance</em></>} sub="Most finished in this time, with average quiz score, time and tries.">
           {d.courses.length ? (
             <BarRows
               rows={d.courses.slice(0, 8).map((c) => ({
@@ -144,6 +147,8 @@ export function TeamDashboard({ orgName, roles, locations, d, f }: { orgName: st
                   <>
                     <span className="font-medium text-ink">{c.finishes}</span> finished
                     {c.avgScore != null && <> · avg {c.avgScore}%</>}
+                    {d.learning.byCourse[c.id]?.minutes != null && <> · {mins(d.learning.byCourse[c.id].minutes)}</>}
+                    {d.learning.byCourse[c.id]?.tries != null && <> · {d.learning.byCourse[c.id].tries} tries</>}
                     {c.assigned > 0 && <> · {Math.round((c.current / c.assigned) * 100)}% done</>}
                   </>
                 ),
@@ -182,10 +187,48 @@ export function TeamDashboard({ orgName, roles, locations, d, f }: { orgName: st
         </div>
       </div>
 
+      <section className="print-only viz-panel mt-6">
+        <h2 className="mb-2 text-2xl">Course <em>summary</em></h2>
+        <table className="w-full text-left text-[0.8rem]">
+          <thead className="label border-b border-line text-muted">
+            <tr>
+              <th className="py-1.5 pr-2 font-semibold">Course</th>
+              <th className="py-1.5 pr-2 font-semibold">Assigned</th>
+              <th className="py-1.5 pr-2 font-semibold">Done</th>
+              <th className="py-1.5 pr-2 font-semibold">Late</th>
+              <th className="py-1.5 pr-2 font-semibold">Finished in period</th>
+              <th className="py-1.5 pr-2 font-semibold">Avg score</th>
+              <th className="py-1.5 pr-2 font-semibold">Avg time</th>
+              <th className="py-1.5 font-semibold">Avg tries</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {d.courses.filter((c) => c.assigned || c.finishes).map((c) => {
+              const l = d.learning.byCourse[c.id];
+              return (
+                <tr key={c.id} style={{ breakInside: "avoid" }}>
+                  <td className="py-1.5 pr-2">{c.title}</td>
+                  <td className="py-1.5 pr-2">{c.assigned}</td>
+                  <td className="py-1.5 pr-2">{c.assigned ? `${Math.round((c.current / c.assigned) * 100)}%` : "–"}</td>
+                  <td className="py-1.5 pr-2">{c.late}</td>
+                  <td className="py-1.5 pr-2">{c.finishes}</td>
+                  <td className="py-1.5 pr-2">{c.avgScore != null ? `${c.avgScore}%` : "–"}</td>
+                  <td className="py-1.5 pr-2">{l?.minutes != null ? mins(l.minutes) : "–"}</td>
+                  <td className="py-1.5">{l?.tries ?? "–"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        <p className="mt-3 text-xs text-muted">
+          Full records with dates, versions and certificate codes: Reports, Training records (CSV).
+        </p>
+      </section>
+
       <p className="mt-6 text-sm text-muted no-print">
         Tip: hover or tap any bar, dot or square to see its numbers. Use <strong>Print or save PDF</strong> for an audit snapshot.
       </p>
-    </>
+    </div>
   );
 }
 

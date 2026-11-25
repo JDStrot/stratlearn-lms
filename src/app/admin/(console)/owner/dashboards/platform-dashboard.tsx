@@ -4,6 +4,7 @@ import { PageHead } from "../../../ui";
 import { RANGES, type Bucket, type Range, type TeamInsights } from "../../../insights";
 import { BUCKET, BUCKET_ORDER, BarRows, Columns, Donut, Empty, Kpi, Panel, PercentLine, SplitBar, StackRows } from "../../../charts";
 import { PrintSnapshot } from "../../../print-button";
+import { LearningPanels } from "../../../learning-panels";
 
 export type ClientInsights = { org: { id: string; name: string; plan: string; status: string; seat_limit: number | null }; d: TeamInsights };
 
@@ -43,10 +44,32 @@ export function PlatformDashboard({ per, orgs, plans, range, f }: { per: ClientI
     .slice(0, 10);
   const lang = { en: per.reduce((a, p) => a + p.d.langCount.en, 0), es: per.reduce((a, p) => a + p.d.langCount.es, 0) };
   const unit = range === "3m" ? "week" : "month";
+  const L = per.map((p) => p.d.learning);
+  const wavg = (pick: (l: (typeof L)[number]) => number | null, w: (l: (typeof L)[number]) => number) => {
+    const tot = L.reduce((a, l) => a + (pick(l) != null ? w(l) : 0), 0);
+    return tot ? L.reduce((a, l) => a + (pick(l) ?? 0) * (pick(l) != null ? w(l) : 0), 0) / tot : null;
+  };
+  const avgTries = wavg((l) => l.avgTries, (l) => l.triedCount);
+  const avgMinutes = wavg((l) => l.avgMinutes, (l) => l.timedCount);
+  const firstTryPct = wavg((l) => l.firstTryPct, (l) => l.triedCount);
+  const learning = {
+    tracking: L.some((l) => l.tracking),
+    avgMinutes: avgMinutes == null ? null : Math.round(avgMinutes),
+    totalHours: Math.round(L.reduce((a, l) => a + l.totalHours, 0) * 10) / 10,
+    timedCount: L.reduce((a, l) => a + l.timedCount, 0),
+    avgTries: avgTries == null ? null : Math.round(avgTries * 10) / 10,
+    firstTryPct: firstTryPct == null ? null : Math.round(firstTryPct),
+    triedCount: L.reduce((a, l) => a + l.triedCount, 0),
+    failedTries: L.reduce((a, l) => a + l.failedTries, 0),
+    scoreBands: (L[0]?.scoreBands ?? []).map((b, i) => ({ ...b, value: L.reduce((a, l) => a + l.scoreBands[i].value, 0) })),
+    triesDist: (L[0]?.triesDist ?? []).map((b, i) => ({ ...b, value: L.reduce((a, l) => a + l.triesDist[i].value, 0) })),
+    byCourse: {},
+  };
+
   const clientsByLate = [...per].sort((a, b) => b.d.late - a.d.late || a.d.pct - b.d.pct);
 
   return (
-    <>
+    <div className="viz-root">
       <div className="print-only mb-6 border-b border-line pb-4">
         <p className="eyebrow">STRATLEARN platform snapshot</p>
         <p className="mt-1 font-serif text-3xl text-plum">All clients{f.plan ? ` · ${f.plan}` : ""}</p>
@@ -108,6 +131,8 @@ export function PlatformDashboard({ per, orgs, plans, range, f }: { per: ClientI
           {months.some((m) => m.value) ? <Columns data={months} unit={["person to retrain", "people to retrain"]} tone="violet" /> : <Empty>No retraining dates in the next 6 months.</Empty>}
         </Panel>
       </div>
+
+      <LearningPanels l={learning} unitNote={`across all clients in the ${RANGES[range].toLowerCase()}`} />
 
       <Panel className="mt-6" title={<>Clients, <em>side by side</em></>} sub="Most late first. Click a client to open it.">
         {per.length ? (
@@ -191,6 +216,6 @@ export function PlatformDashboard({ per, orgs, plans, range, f }: { per: ClientI
           </Panel>
         </div>
       </div>
-    </>
+    </div>
   );
 }

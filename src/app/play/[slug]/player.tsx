@@ -13,6 +13,57 @@ import { useEffect, useRef, useState } from "react";
 export function CoursePlayer({ slug, lang }: { slug: string; lang: "en" | "es" }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [saved, setSaved] = useState(false);
+  const flushTime = useRef<() => Promise<unknown>>(async () => {});
+  const onFrameLoad = useRef<() => void>(() => {});
+
+  // Active time in the course: counts while the tab is visible and the learner
+  // has tapped, typed or scrolled in the last 2 minutes. Sent every 30 seconds,
+  // and when the page is hidden or closed.
+  useEffect(() => {
+    let last = Date.now();
+    let pending = 0;
+    const touch = () => (last = Date.now());
+    const evs = ["pointerdown", "keydown", "wheel", "touchstart", "scroll"] as const;
+    const watch = (w: Window | null | undefined) => {
+      if (!w) return;
+      for (const ev of evs) w.addEventListener(ev, touch, { passive: true, capture: true });
+    };
+    watch(window);
+    // The course frame is swapped for a fresh one on "Try again", so it
+    // reports each load through onFrameLoad.
+    onFrameLoad.current = () => {
+      touch();
+      try {
+        watch(frame.current?.contentWindow);
+      } catch {}
+    };
+    const send = async (beacon = false) => {
+      const seconds = Math.round(pending);
+      if (seconds < 1) return;
+      pending = 0;
+      const body = JSON.stringify({ slug, seconds });
+      if (beacon && navigator.sendBeacon) navigator.sendBeacon("/api/progress", new Blob([body], { type: "application/json" }));
+      else await fetch("/api/progress", { method: "POST", headers: { "content-type": "application/json" }, body, keepalive: true }).catch(() => {});
+    };
+    flushTime.current = () => send();
+    const tick = setInterval(() => {
+      if (document.visibilityState === "visible" && Date.now() - last < 120_000) pending += 5;
+    }, 5000);
+    const flush = setInterval(() => void send(), 30_000);
+    const onHide = () => {
+      if (document.visibilityState === "hidden") void send(true);
+    };
+    const onLeave = () => void send(true);
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", onLeave);
+    return () => {
+      clearInterval(tick);
+      clearInterval(flush);
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", onLeave);
+      void send(true);
+    };
+  }, [slug]);
   // Score under the team's passing bar: a failed try.
   const [failed, setFailed] = useState<{ score?: number; need?: number; triesLeft?: number | null; locked?: boolean } | null>(null);
   const [round, setRound] = useState(0);
@@ -22,7 +73,16 @@ export function CoursePlayer({ slug, lang }: { slug: string; lang: "en" | "es" }
       if (e.origin !== window.location.origin) return;
       if (e.source !== frame.current?.contentWindow) return;
       const msg = e.data as { type?: string; score?: number; lang?: string };
+      if (msg?.type === "stratlearn:try") {
+        void fetch("/api/progress", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ slug, failed: true, score: msg.score, lang: msg.lang ?? lang }),
+        });
+        return;
+      }
       if (msg?.type !== "stratlearn:complete") return;
+      await flushTime.current();
       const res = await fetch("/api/completions", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -47,6 +107,7 @@ export function CoursePlayer({ slug, lang }: { slug: string; lang: "en" | "es" }
         title="Course"
         className="absolute inset-0 size-full border-0"
         allow="fullscreen; autoplay"
+        onLoad={() => onFrameLoad.current()}
       />
       {failed && (
         <div role="alert" className="card absolute bottom-4 left-1/2 flex w-[calc(100%-32px)] max-w-md -translate-x-1/2 flex-col gap-3 p-5 shadow-soft">
