@@ -25,7 +25,7 @@ export default async function PlayPage({ params }: { params: Promise<{ slug: str
           <Logo tone="light" />
         </span>
       </nav>
-      <CoursePlayer slug={course.slug} lang={learner.preferred_language} />
+      <CoursePlayer slug={course.slug} lang={learner.preferred_language} title={(es && course.title_es) || course.title} />
     </main>
   );
 }

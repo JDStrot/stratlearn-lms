@@ -111,6 +111,40 @@ export async function POST(req: NextRequest) {
 }
 
 /**
+ * The learner's newest certificate and the share link for this course's pearl,
+ * for the finish screen: GET /api/completions?slug=<slug>.
+ */
+export async function GET(req: NextRequest) {
+  const session = await readSession();
+  if (!session) return NextResponse.json({ error: "not signed in" }, { status: 401 });
+  const slug = req.nextUrl.searchParams.get("slug");
+  if (!slug) return NextResponse.json({ error: "missing slug" }, { status: 400 });
+
+  const db = supabaseAdmin();
+  const { data: course } = await db.from("courses").select("id").eq("slug", slug).maybeSingle();
+  if (!course) return NextResponse.json({ certificate: null, share: null });
+
+  const [{ data: cert }, { data: badge }] = await Promise.all([
+    db
+      .from("certificates")
+      .select("verify_code")
+      .eq("learner_id", session.lid)
+      .eq("course_id", course.id)
+      .order("issued_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    db
+      .from("learner_badges")
+      .select("share_token, badges!inner(course_id)")
+      .eq("learner_id", session.lid)
+      .eq("badges.course_id", course.id)
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  return NextResponse.json({ certificate: cert?.verify_code ?? null, share: badge?.share_token ?? null });
+}
+
+/**
  * Moves the time spent in this round onto the completion and records how many
  * final-check tries it took (failed tries this round + this pass).
  * Best-effort: does nothing until the time-and-tries database update has run.
