@@ -22,6 +22,10 @@ import "server-only";
  *    certificate page (renderBadge) is replaced: its "Get my pearl and
  *    certificate" button sends "stratlearn:finished", and the player shows the
  *    app's finish screen (back to My courses, certificate, share).
+ * 5. Hands "Ask a trainer" to the app. Some courses have their own
+ *    "Ask a trainer" button (id="askT"); when the course needs a trainer, a tap
+ *    sends "stratlearn:ask" and the app opens its own question box, which
+ *    reaches the team's real trainer.
  */
 export function courseHook(opts: {
   learnerId: string;
@@ -35,6 +39,8 @@ export function courseHook(opts: {
    * reviewing a finished course.
    */
   round?: string;
+  /** This course has Ask a trainer (src/lib/trainer.ts). */
+  ask?: boolean;
 }) {
   const prefix = `sl:${opts.learnerId}:${opts.slug}:v${opts.courseVersion}:${opts.round ? `r${opts.round}:` : ""}`;
   const js = `(function(){
@@ -58,6 +64,9 @@ if(!DONE&&window.MutationObserver){var seen=[];new MutationObserver(function(){
   if(m&&+m[2]>0)sc=Math.round(+m[1]/+m[2]*100);
   try{window.parent.postMessage({type:"stratlearn:try",score:sc,lang:window.LOTTIE_LANG||"en"},location.origin)}catch(e){}
 }).observe(document.documentElement,{childList:true,subtree:true})}
+if(${opts.ask ? "true" : "false"})document.addEventListener("click",function(e){var t=e.target;
+  if(!t||!t.closest||!t.closest("#askT"))return;e.preventDefault();e.stopPropagation();
+  try{window.parent.postMessage({type:"stratlearn:ask"},location.origin)}catch(x){}},true);
 function finished(){try{window.parent.postMessage({type:"stratlearn:finished"},location.origin)}catch(e){}}
 function takeEnd(){if(typeof window.renderBadge==="function"&&window.renderBadge!==finished){try{window.renderBadge=finished}catch(e){}}}
 document.addEventListener("DOMContentLoaded",takeEnd);window.addEventListener("load",takeEnd);

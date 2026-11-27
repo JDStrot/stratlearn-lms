@@ -9,6 +9,7 @@ const LINKS = [
   ["/admin/assign", "Assign training"],
   ["/admin/dashboards", "Dashboards"],
   ["/admin/reports", "Reports"],
+  ["/admin/questions", "Questions"],
   ["/admin/badges", "Print badges"],
   ["/admin/settings", "Team settings"],
 ] as const;

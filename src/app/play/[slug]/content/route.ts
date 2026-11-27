@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { courseHook } from "@/lib/course-hook";
 import { attemptState, roundStartOf } from "@/lib/attempts";
 import { loadOrgSettings } from "@/lib/org-settings";
+import { topicOf } from "@/lib/trainer";
 
 /**
  * Serves a course's HTML file from the private "courses" storage bucket.
@@ -41,6 +42,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
     slug: course.slug,
     courseVersion: course.version,
     completed: Boolean(item.completedAt),
+    ask: !!topicOf(course.slug),
     round: item.completedAt ? "" : roundKey(item.lastFinishedAt, item.retakeAfter) + (tries ? `t${tries}` : ""),
   });
   const html = hook + (await data.text());

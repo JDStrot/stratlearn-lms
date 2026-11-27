@@ -7,12 +7,15 @@ import { locationZones } from "@/lib/team-time";
 import { STATUS_LABEL, isLate, type Status } from "@/lib/status";
 import { loadTeam, teamStatus } from "@/app/admin/data";
 import { statusRows, toCsv } from "@/app/admin/(console)/reports/rows";
+import { addBusinessDays } from "@/lib/trainer";
 
 /**
  * Runs once a day (vercel.json, 14:00 UTC = 6-7 AM Pacific):
  *  1. reminds workers (who have an email) about training due soon or late
  *  2. tells managers about training that's been overdue too long
  *  3. emails scheduled training reports
+ *  4. Ask a trainer: reminds the trainer about a question after 1 business
+ *     day, and tells managers after 2 (or right away when no trainer is set)
  * Every message is written to notification_log, so nobody gets the same
  * reminder twice within the team's "repeat every" window.
  */
@@ -30,7 +33,7 @@ export async function GET(req: NextRequest) {
   const { data: orgs } = await db.from("organizations").select("*").eq("status", "active");
   const { data: users } = await db.auth.admin.listUsers({ page: 1, perPage: 1000 });
   const emailOf = new Map((users?.users ?? []).map((u) => [u.id, u.email ?? ""]));
-  const summary: Record<string, { reminders: number; escalations: number; report: boolean }> = {};
+  const summary: Record<string, { reminders: number; escalations: number; report: boolean; questions: number }> = {};
 
   for (const org of orgs ?? []) {
     try {
@@ -160,6 +163,79 @@ async function runOrg(org: Org, emailOf: Map<string, string>) {
   // Only remember sends that actually went out, so they're retried once email is on.
   const keep = log.filter((l) => l.status === "sent" || l.kind === "escalation_digest" || l.kind === "report");
   if (keep.length) await db.from("notification_log").insert(keep);
-  return { reminders, escalations, report };
+  const questions = await followUpQuestions(org, emailOf).catch((e) => {
+    console.error("question follow-up failed", org.join_code, e);
+    return 0;
+  });
+  return { reminders, escalations, report, questions };
+}
+
+/** Ask a trainer follow-ups. Does nothing until the Ask a trainer database update has run. */
+async function followUpQuestions(org: Org, emailOf: Map<string, string>) {
+  const db = supabaseAdmin();
+  const { data: open, error } = await db
+    .from("trainer_questions")
+    .select("id, created_at, question, token, sent_to, reminded_at, escalated_at, learners(display_name, location_id), courses(title)")
+    .eq("org_id", org.id)
+    .eq("status", "open")
+    .limit(500);
+  if (error || !open?.length) return 0;
+  type Q = {
+    id: string;
+    created_at: string;
+    question: string;
+    token: string;
+    sent_to: { name?: string; email?: string | null } | null;
+    reminded_at: string | null;
+    escalated_at: string | null;
+    learners: { display_name: string; location_id: string | null } | null;
+    courses: { title: string } | null;
+  };
+  const now = Date.now();
+  const rows = open as unknown as Q[];
+  let sent = 0;
+
+  // Trainer reminder after 1 business day.
+  for (const q of rows) {
+    const email = q.sent_to?.email;
+    if (!email || q.reminded_at || addBusinessDays(new Date(q.created_at), 1).getTime() > now) continue;
+    const status = await sendEmail({
+      to: [email],
+      subject: `Reminder: ${q.learners?.display_name ?? "A worker"} is waiting for an answer`,
+      text:
+        `${q.learners?.display_name ?? "A worker"} at ${org.name} asked this in ${q.courses?.title ?? "a course"}:\n\n${q.question}\n\n` +
+        `Answer here (no sign-in needed): ${SITE}/answer/${q.token}\n\nPlease answer within two business days of the question.`,
+    });
+    if (status === "sent") {
+      await db.from("trainer_questions").update({ reminded_at: new Date().toISOString() }).eq("id", q.id);
+      sent++;
+    }
+  }
+
+  // Managers after 2 business days, or right away when no trainer email was set.
+  const late = rows.filter((q) => !q.escalated_at && (!q.sent_to?.email || addBusinessDays(new Date(q.created_at), 2).getTime() <= now));
+  if (!late.length) return sent;
+  const { data: staff } = await db.from("staff_members").select("user_id, role, location_ids").eq("org_id", org.id);
+  const told = new Set<string>();
+  for (const m of staff ?? []) {
+    const email = emailOf.get(m.user_id);
+    if (!email) continue;
+    const scope = m.role === "manager" && (m.location_ids as string[] | null)?.length ? (m.location_ids as string[]) : null;
+    const mine = late.filter((q) => !scope || (q.learners?.location_id && scope.includes(q.learners.location_id)));
+    if (!mine.length) continue;
+    const status = await sendEmail({
+      to: [email],
+      subject: `${mine.length} training ${mine.length === 1 ? "question needs" : "questions need"} an answer at ${org.name}`,
+      text:
+        `Workers asked these through Ask a trainer and are still waiting:\n\n` +
+        mine
+          .map((q) => `• ${q.learners?.display_name ?? "Someone"} (${q.courses?.title ?? "course"}): ${q.question.slice(0, 200)}${q.sent_to?.email ? "" : " [no trainer set]"}`)
+          .join("\n") +
+        `\n\nAnswer them here: ${SITE}/admin/questions`,
+    });
+    if (status === "sent") for (const q of mine) told.add(q.id);
+  }
+  if (told.size) await db.from("trainer_questions").update({ escalated_at: new Date().toISOString() }).in("id", [...told]);
+  return sent + told.size;
 }
 
