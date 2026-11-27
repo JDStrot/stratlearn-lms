@@ -82,6 +82,10 @@ export function CoursePlayer({ slug, lang, title }: { slug: string; lang: "en" |
       if (e.origin !== window.location.origin) return;
       if (e.source !== frame.current?.contentWindow) return;
       const msg = e.data as { type?: string; score?: number; lang?: string };
+      if (msg?.type === "stratlearn:ask") {
+        window.dispatchEvent(new Event("stratlearn:ask"));
+        return;
+      }
       if (msg?.type === "stratlearn:try") {
         void fetch("/api/progress", {
           method: "POST",

@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import { requireLearner } from "@/lib/learner";
 import { assignedCourseBySlug } from "@/lib/course-access";
 import { Logo } from "@/components/logo";
+import { topicOf } from "@/lib/trainer";
 import { CoursePlayer } from "./player";
+import { AskTrainer } from "./ask-trainer";
 
 export default async function PlayPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -21,6 +23,7 @@ export default async function PlayPage({ params }: { params: Promise<{ slug: str
         <span className="min-w-0 flex-1 truncate text-center font-serif text-xl text-white">
           {(es && course.title_es) || course.title}
         </span>
+        {topicOf(course.slug) && <AskTrainer slug={course.slug} es={es} />}
         <span className="hidden w-[130px] overflow-hidden sm:block [&_img]:w-[130px]">
           <Logo tone="light" />
         </span>

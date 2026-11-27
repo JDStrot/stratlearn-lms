@@ -5,6 +5,7 @@ import { assignedCourses } from "@/lib/learner";
 import { addMonths } from "@/lib/status";
 import { attemptState, roundStartOf } from "@/lib/attempts";
 import { loadOrgSettings } from "@/lib/org-settings";
+import { loadTrainers, topicOf, trainerSnapshot } from "@/lib/trainer";
 import type { Learner } from "@/lib/learner";
 
 /**
@@ -106,6 +107,14 @@ export async function POST(req: NextRequest) {
     completionId: completion.id,
     roundStart: roundStartOf(item.lastFinishedAt, item.retakeAfter, item.completedAt),
   });
+
+  // Who the trainer was for courses with Ask a trainer, kept on the record.
+  const topic = topicOf(course.slug);
+  if (topic) {
+    const trainers = await loadTrainers(learner.org_id);
+    const snap = trainers.ready ? trainerSnapshot(trainers, topic) : null;
+    if (snap) await db.from("completions").update({ trainer_snapshot: snap }).eq("id", completion.id);
+  }
 
   return NextResponse.json({ ok: true, certificate: cert?.verify_code ?? null });
 }

@@ -37,8 +37,11 @@ export async function GET(req: NextRequest) {
         .order("completed_at", { ascending: false })
         .limit(100000);
     // Time and tries columns exist once the time-and-tries database update has run.
-    const full = await query(", seconds_spent, attempts");
-    const data = full.error ? (await query("")).data : full.data;
+    // The trainer column exists once the Ask a trainer database update has run.
+    let res = await query(", seconds_spent, attempts, trainer_snapshot");
+    if (res.error) res = await query(", seconds_spent, attempts");
+    if (res.error) res = await query("");
+    const data = res.data;
     type Row = {
       completed_at: string;
       course_version: number;
@@ -46,6 +49,7 @@ export async function GET(req: NextRequest) {
       score: number | null;
       seconds_spent?: number | null;
       attempts?: number | null;
+      trainer_snapshot?: { name?: string; title?: string | null; qualifications?: string | null } | null;
       learners: { display_name: string; username: string; employee_id: string | null; location_id: string | null } | null;
       courses: { slug: string; title: string } | null;
       certificates: { verify_code: string; expires_at: string | null }[] | { verify_code: string; expires_at: string | null } | null;
@@ -54,7 +58,7 @@ export async function GET(req: NextRequest) {
     const list = ((data ?? []) as unknown as Row[]).filter((r) => inScope(s, r.learners?.location_id ?? null));
     const h = header("Completed", list.map((r) => r.learners?.location_id));
     csv = toCsv(
-      ["Name", "Sign-in name", "Employee ID", "Course", "Course ID", "Version", h.label, ...(h.extra ? ["Time zone"] : []), "Valid until", "Score", "Minutes spent", "Final-check tries", "Language", "Certificate code", "Verify link"],
+      ["Name", "Sign-in name", "Employee ID", "Course", "Course ID", "Version", h.label, ...(h.extra ? ["Time zone"] : []), "Valid until", "Score", "Minutes spent", "Final-check tries", "Language", "Trainer", "Trainer qualifications", "Certificate code", "Verify link"],
       list.map((r) => {
         const cert = Array.isArray(r.certificates) ? r.certificates[0] : r.certificates;
         const loc = r.learners?.location_id;
@@ -72,6 +76,8 @@ export async function GET(req: NextRequest) {
           r.seconds_spent ? Math.round(r.seconds_spent / 6) / 10 : "",
           r.attempts ?? "",
           r.language,
+          r.trainer_snapshot?.name ? [r.trainer_snapshot.name, r.trainer_snapshot.title].filter(Boolean).join(", ") : "",
+          r.trainer_snapshot?.qualifications ?? "",
           cert?.verify_code,
           cert ? `${origin}/verify/${cert.verify_code}` : "",
         ];
@@ -112,6 +118,51 @@ export async function GET(req: NextRequest) {
       ]),
     );
     name = `${team}-quiz-tries-${stamp}.csv`;
+  } else if (type === "questions") {
+    // Ask a trainer: every question and answer, kept with the training records.
+    const { data } = await supabaseAdmin()
+      .from("trainer_questions")
+      .select("created_at, topic, question, lang, answer, answered_at, answered_by, sent_to, learners(display_name, username, employee_id, location_id), courses(slug, title)")
+      .eq("org_id", s.org.id)
+      .order("created_at", { ascending: false })
+      .limit(100000);
+    type Row = {
+      created_at: string;
+      topic: string;
+      question: string;
+      lang: string;
+      answer: string | null;
+      answered_at: string | null;
+      answered_by: string | null;
+      sent_to: { name?: string; email?: string | null } | null;
+      learners: { display_name: string; username: string; employee_id: string | null; location_id: string | null } | null;
+      courses: { slug: string; title: string } | null;
+    };
+    const list = ((data ?? []) as unknown as Row[]).filter((r) => inScope(s, r.learners?.location_id ?? null));
+    const h = header("Asked", list.map((r) => r.learners?.location_id));
+    csv = toCsv(
+      ["Name", "Sign-in name", "Employee ID", "Course", "Course ID", h.label, ...(h.extra ? ["Time zone"] : []), "Language", "Sent to", "Question", "Answer", "Answered by", "Answered", "Business days to answer"],
+      list.map((r) => {
+        const loc = r.learners?.location_id;
+        return [
+          r.learners?.display_name,
+          r.learners?.username,
+          r.learners?.employee_id,
+          r.courses?.title,
+          r.courses?.slug,
+          when(r.created_at, loc),
+          ...(h.extra ? [tzShort(zoneOf(loc))] : []),
+          r.lang === "es" ? "Spanish" : "English",
+          r.sent_to?.name ? `${r.sent_to.name}${r.sent_to.email ? ` <${r.sent_to.email}>` : ""}` : "Managers (no trainer set)",
+          r.question,
+          r.answer ?? "",
+          r.answered_by ?? "",
+          when(r.answered_at, loc),
+          r.answered_at ? businessDaysBetween(r.created_at, r.answered_at) : "",
+        ];
+      }),
+    );
+    name = `${team}-trainer-questions-${stamp}.csv`;
   } else if (type === "activity") {
     const { data } = await supabaseAdmin()
       .from("admin_events")
@@ -162,4 +213,19 @@ export async function GET(req: NextRequest) {
       "cache-control": "no-store",
     },
   });
+}
+
+/** Whole business days (Mon-Fri) from asking to answering; same day = 0. */
+function businessDaysBetween(from: string, to: string) {
+  const a = new Date(from);
+  const b = new Date(to);
+  let n = 0;
+  const d = new Date(Date.UTC(a.getUTCFullYear(), a.getUTCMonth(), a.getUTCDate()));
+  const end = Date.UTC(b.getUTCFullYear(), b.getUTCMonth(), b.getUTCDate());
+  while (d.getTime() < end) {
+    d.setUTCDate(d.getUTCDate() + 1);
+    const wd = d.getUTCDay();
+    if (wd !== 0 && wd !== 6) n++;
+  }
+  return n;
 }

@@ -52,6 +52,7 @@ export default async function Settings() {
               ["/admin/settings/reminders", "Reminders & records", "Nudges, telling managers about overdue training, record keeping, scheduled reports."],
               ["/admin/settings/quizzes", "Quizzes & certificates", "Passing score, number of tries, your logo and signer on certificates."],
               ["/admin/settings/documents", "Policies & plans", "Upload your own plans, like the Exposure Control Plan, for workers to read."],
+              ["/admin/settings/trainers", "Ask a trainer", "Your safety trainer and HR trainer, who answer workers' questions about the training."],
             ].map(([href, title, sub]) => (
               <Link key={href} href={href} className="card card-hover flex flex-col gap-1 p-4 no-underline">
                 <span className="font-medium text-ink">{title}</span>
