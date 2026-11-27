@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email";
+import { reportError } from "@/lib/alerts";
 import { readNotify, readRecords } from "@/lib/org-settings";
 import { dayIn } from "@/lib/time-zones";
 import { locationZones } from "@/lib/team-time";
@@ -40,6 +41,7 @@ export async function GET(req: NextRequest) {
       summary[org.join_code] = await runOrg(org, emailOf);
     } catch (e) {
       console.error("cron org failed", org.join_code, e);
+      await reportError({ source: "cron", message: `Daily job failed for team ${org.join_code}: ${e instanceof Error ? e.message : String(e)}`, path: "/api/cron/daily" });
     }
   }
   return NextResponse.json({ ok: true, summary });

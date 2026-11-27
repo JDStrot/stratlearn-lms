@@ -67,6 +67,7 @@ export default async function OwnerHome() {
         <Link href="/admin/owner/dashboards" className="btn btn-primary btn-sm">Platform dashboards</Link>
         <Link href="/admin/owner/library" className="btn btn-ghost btn-sm">Course library</Link>
         <Link href="/admin/owner/certificates" className="btn btn-ghost btn-sm">Certificate lookup</Link>
+        <Link href="/admin/owner/errors" className="btn btn-ghost btn-sm">Errors</Link>
         <Link href="/admin/owner/feedback" className="btn btn-ghost btn-sm">
           Contact us messages{newFeedback.count ? ` (${newFeedback.count} new)` : ""}
         </Link>
