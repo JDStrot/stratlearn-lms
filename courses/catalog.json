@@ -64,7 +64,69 @@
   "delegating-tasks",
   "accountability-talks",
   "safety-huddle",
-  "injury-report"
+  "injury-report",
+  "anatomy-basics-trainers",
+  "lower-body-anatomy",
+  "upper-body-anatomy",
+  "core-and-spine",
+  "joints-and-movement",
+  "posture-muscle-balance",
+  "heart-lungs-exercise",
+  "overtraining-rhabdo",
+  "concussion-head-injury",
+  "body-positive-gym",
+  "eating-disorder-warning-signs",
+  "social-media-trainers",
+  "building-client-base",
+  "pregnant-postpartum-clients",
+  "training-older-adults",
+  "teaching-to-the-beat",
+  "cueing-class-design",
+  "music-licensing-fitness",
+  "electrical-safety",
+  "lockout-tagout",
+  "heat-illness-prevention",
+  "first-aid-cpr",
+  "ladder-safety",
+  "hearing-conservation",
+  "respiratory-protection",
+  "fall-protection",
+  "forklift-safety",
+  "spill-response",
+  "hand-power-tools",
+  "office-ergonomics",
+  "severe-weather",
+  "working-alone",
+  "active-shooter",
+  "infection-prevention",
+  "unconscious-bias",
+  "inclusive-language",
+  "disability-etiquette",
+  "religion-at-work",
+  "workplace-bullying",
+  "bystander-intervention",
+  "digital-harassment-remote",
+  "mental-health-basics",
+  "stress-anxiety-coping",
+  "passwords-mfa",
+  "social-engineering",
+  "deepfake-scams",
+  "new-hire-orientation",
+  "drugs-alcohol-fentanyl",
+  "retaliation-speaking-up",
+  "reasonable-accommodations",
+  "active-listening",
+  "coworker-conflict",
+  "time-management",
+  "teamwork-busy-shift",
+  "problem-solving",
+  "clear-texts-emails",
+  "taking-feedback",
+  "owning-a-mistake",
+  "calling-out",
+  "talking-to-your-boss",
+  "first-job",
+  "burnout-bad-days"
  ],
  "packs": [
   {
@@ -101,6 +163,65 @@
    }
   },
   {
+   "slug": "safety-respect-skills",
+   "title": "Safety, Respect and People Skills",
+   "title_es": "Seguridad, respeto y habilidades",
+   "industry": "any",
+   "description": "More safety topics, respect and HR basics, and everyday people skills. Pick a path, or a few courses, for any team.",
+   "paths": {
+    "safety": [
+     "electrical-safety",
+     "lockout-tagout",
+     "heat-illness-prevention",
+     "first-aid-cpr",
+     "ladder-safety",
+     "hearing-conservation",
+     "respiratory-protection",
+     "fall-protection",
+     "forklift-safety",
+     "spill-response",
+     "hand-power-tools",
+     "office-ergonomics",
+     "severe-weather",
+     "working-alone",
+     "active-shooter",
+     "infection-prevention"
+    ],
+    "respect-and-hr": [
+     "unconscious-bias",
+     "inclusive-language",
+     "disability-etiquette",
+     "religion-at-work",
+     "workplace-bullying",
+     "bystander-intervention",
+     "digital-harassment-remote",
+     "mental-health-basics",
+     "stress-anxiety-coping",
+     "passwords-mfa",
+     "social-engineering",
+     "deepfake-scams",
+     "new-hire-orientation",
+     "drugs-alcohol-fentanyl",
+     "retaliation-speaking-up",
+     "reasonable-accommodations"
+    ],
+    "people-skills": [
+     "active-listening",
+     "coworker-conflict",
+     "time-management",
+     "teamwork-busy-shift",
+     "problem-solving",
+     "clear-texts-emails",
+     "taking-feedback",
+     "owning-a-mistake",
+     "calling-out",
+     "talking-to-your-boss",
+     "first-job",
+     "burnout-bad-days"
+    ]
+   }
+  },
+  {
    "slug": "fitness-gyms",
    "title": "Fitness and Gyms",
    "title_es": "Gimnasios y fitness",
@@ -109,13 +230,36 @@
    "paths": {
     "trainers": [
      "screening-new-clients",
+     "anatomy-basics-trainers",
      "coaching-beginners-disabilities",
      "preventing-client-injuries",
      "fitness-emergency-response",
+     "overtraining-rhabdo",
+     "concussion-head-injury",
      "scope-of-practice-fitness",
      "hands-on-cues-consent",
      "inclusive-coaching-every-body",
-     "professional-boundaries-fitness"
+     "professional-boundaries-fitness",
+     "body-positive-gym",
+     "eating-disorder-warning-signs",
+     "training-older-adults",
+     "pregnant-postpartum-clients",
+     "social-media-trainers",
+     "building-client-base"
+    ],
+    "anatomy": [
+     "anatomy-basics-trainers",
+     "lower-body-anatomy",
+     "upper-body-anatomy",
+     "core-and-spine",
+     "joints-and-movement",
+     "posture-muscle-balance",
+     "heart-lungs-exercise"
+    ],
+    "group-classes": [
+     "cueing-class-design",
+     "teaching-to-the-beat",
+     "music-licensing-fitness"
     ],
     "front-desk": [
      "gym-tours-trials-first-visit",
@@ -123,6 +267,7 @@
      "gym-cancellations-freezes",
      "billing-disputes-refunds",
      "member-retention-first-90-days",
+     "body-positive-gym",
      "customer-service-basics",
      "customer-goes-off",
      "card-payment-safety"
@@ -294,6 +439,18 @@
   "asbestos-awareness": {
    "months": 12,
    "note": "OSHA asbestos standards: every year"
+  },
+  "respiratory-protection": {
+   "months": 12,
+   "note": "OSHA 1910.134: every year"
+  },
+  "hearing-conservation": {
+   "months": 12,
+   "note": "OSHA 1910.95: every year"
+  },
+  "forklift-safety": {
+   "months": 36,
+   "note": "OSHA 1910.178: performance evaluation at least every 3 years"
   }
  },
  "versionNotes": {}

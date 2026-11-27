@@ -63,7 +63,7 @@ export function AssignForm({
                   <option value={`pack:${packId}:*`}>Whole pack</option>
                   {pack?.paths.map((x) => (
                     <option key={x.path} value={`pack:${packId}:${x.path}`}>
-                      {x.path.replace(/^./, (c) => c.toUpperCase())} ({x.count} courses)
+                      {x.path.replace(/-/g, " ").replace(/\bhr\b/, "HR").replace(/^./, (c) => c.toUpperCase())} ({x.count} courses)
                     </option>
                   ))}
                 </select>
