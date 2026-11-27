@@ -26,6 +26,8 @@ import "server-only";
  *    "Ask a trainer" button (id="askT"); when the course needs a trainer, a tap
  *    sends "stratlearn:ask" and the app opens its own question box, which
  *    reaches the team's real trainer.
+ * 6. Reports script errors in the course file to error alerts (at most two per
+ *    visit), so a broken course is noticed before a client reports it.
  */
 export function courseHook(opts: {
   learnerId: string;
@@ -47,6 +49,10 @@ export function courseHook(opts: {
 var P=${JSON.stringify(prefix)},DONE=${opts.completed ? "true" : "false"},sent=false;
 var proto=Storage.prototype,g=proto.getItem,s=proto.setItem,r=proto.removeItem,ls=null;
 try{ls=window.localStorage}catch(e){}
+var errSent=0;window.addEventListener("error",function(ev){
+  if(errSent>=2||!ev||!ev.message||/^Script error/.test(ev.message))return;errSent++;
+  try{fetch("/api/client-error",{method:"POST",headers:{"content-type":"application/json"},keepalive:true,
+    body:JSON.stringify({source:"course",slug:${JSON.stringify(opts.slug)},message:String(ev.message).slice(0,500),line:ev.lineno,path:location.pathname})})}catch(e){}});
 if(!ls)return;
 function mine(st){return st===ls}
 function report(st){if(sent||DONE)return;sent=true;var f=st&&st.final||{};
