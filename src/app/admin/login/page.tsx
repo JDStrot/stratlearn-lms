@@ -37,6 +37,10 @@ export default async function StaffLogin({ searchParams }: { searchParams: Promi
               </p>
             )}
             <StaffLoginForm />
+            <p className="mt-6 border-t border-line pt-4 text-center text-xs text-muted">
+              By signing in you agree to the <a href="/terms">Terms</a>, <a href="/privacy">Privacy Policy</a> and{" "}
+              <a href="/client-agreement">client data agreement</a>.
+            </p>
           </section>
         </div>
       </main>

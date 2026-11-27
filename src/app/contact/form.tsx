@@ -14,6 +14,7 @@ export function ContactForm({
   presetCourse,
   presetKind,
   name,
+  stamp,
 }: {
   es: boolean;
   mine: CourseOption[];
@@ -21,6 +22,7 @@ export function ContactForm({
   presetCourse: string;
   presetKind?: Kind;
   name: string;
+  stamp: string;
 }) {
   const [state, action, pending] = useActionState<ContactState, FormData>(sendFeedback, {});
   const [kind, setKind] = useState<Kind>(presetKind ?? "feedback");
@@ -47,6 +49,7 @@ export function ContactForm({
     <form action={action} className="flex flex-col gap-5">
       <input type="hidden" name="lang" value={es ? "es" : "en"} />
       <input type="hidden" name="kind" value={kind} />
+      <input type="hidden" name="stamp" value={stamp} />
       {/* Bots fill this in; people never see it. */}
       <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" className="hidden" />
 
