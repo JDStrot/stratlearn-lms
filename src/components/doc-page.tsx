@@ -45,7 +45,8 @@ export function DocPage({
 export const LEGAL = {
   company: "STRATLEARN LLC",
   site: "learn.stratlearn.co",
-  state: "[STATE]",
-  address: "[MAILING ADDRESS]",
+  state: "California",
+  // Change to the PO Box once it is set up; every legal page reads it from here.
+  address: "4349 Cherokee Ave. #2, San Diego, CA 92104",
   updated: "November 27, 2026",
 };
