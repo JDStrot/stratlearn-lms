@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { assignedCourses, type Learner } from "@/lib/learner";
 import { randomToken } from "@/lib/staff";
 import { sendEmail } from "@/lib/email";
+import { MAX_LINKS, countLinks } from "@/lib/spam";
 import { SITE, TOPIC_LABEL, loadTrainers, topicOf, trainerFor } from "@/lib/trainer";
 
 /**
@@ -59,6 +60,7 @@ export async function POST(req: NextRequest) {
   if (!ctx) return NextResponse.json({ error: "not found" }, { status: 404 });
   const question = String(body?.question ?? "").trim().slice(0, 2000);
   if (question.length < 3) return NextResponse.json({ error: "empty" }, { status: 400 });
+  if (countLinks(question) > MAX_LINKS) return NextResponse.json({ error: "too_many_links" }, { status: 400 });
   const lang = body?.lang === "es" ? "es" : "en";
   const db = supabaseAdmin();
 
@@ -69,6 +71,13 @@ export async function POST(req: NextRequest) {
     .eq("learner_id", ctx.learner.id)
     .gte("created_at", new Date(Date.now() - 86_400_000).toISOString());
   if ((count ?? 0) >= 10) return NextResponse.json({ error: "too_many" }, { status: 429 });
+  // And per team, so one shared sign-in can't flood the trainer's inbox.
+  const { count: teamCount } = await db
+    .from("trainer_questions")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", ctx.learner.org_id)
+    .gte("created_at", new Date(Date.now() - 86_400_000).toISOString());
+  if ((teamCount ?? 0) >= 200) return NextResponse.json({ error: "too_many" }, { status: 429 });
 
   const trainers = await loadTrainers(ctx.learner.org_id);
   if (!trainers.ready) return NextResponse.json({ error: "not_set_up" }, { status: 503 });

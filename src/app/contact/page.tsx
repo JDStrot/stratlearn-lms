@@ -4,6 +4,7 @@ import { readSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { assignedCourses, type Learner } from "@/lib/learner";
 import { ContactForm, type CourseOption } from "./form";
+import { formStamp } from "@/lib/spam";
 
 export const metadata = { title: "STRATLEARN · Contact us" };
 
@@ -64,6 +65,7 @@ export default async function Contact({ searchParams }: { searchParams: Promise<
               presetCourse={preset}
               presetKind={kind === "course_issue" || preset ? "course_issue" : undefined}
               name={learner?.display_name ?? ""}
+              stamp={formStamp()}
             />
           </section>
         </div>

@@ -18,7 +18,7 @@ export function AskTrainer({ slug, es }: { slug: string; es: boolean }) {
   const [open, setOpen] = useState(false);
   const [info, setInfo] = useState<Info | null>(null);
   const [text, setText] = useState("");
-  const [state, setState] = useState<"idle" | "sending" | "sent" | "error" | "too_many">("idle");
+  const [state, setState] = useState<"idle" | "sending" | "sent" | "error" | "too_many" | "links">("idle");
   const box = useRef<HTMLDialogElement>(null);
 
   const load = useCallback(
@@ -55,6 +55,7 @@ export function AskTrainer({ slug, es }: { slug: string; es: boolean }) {
       body: JSON.stringify({ slug, question: text, lang: es ? "es" : "en" }),
     }).catch(() => null);
     if (r?.status === 429) return setState("too_many");
+    if (r?.status === 400 && (await r.json().catch(() => null))?.error === "too_many_links") return setState("links");
     if (!r?.ok) return setState("error");
     setText("");
     setState("sent");
@@ -132,6 +133,7 @@ export function AskTrainer({ slug, es }: { slug: string; es: boolean }) {
               </label>
               {state === "sent" && <p role="status" className="text-sm text-success">{es ? "¡Enviada! Te avisaremos aquí." : "Sent! The answer will show up here."}</p>}
               {state === "error" && <p role="alert" className="text-sm text-error">{es ? "No se pudo enviar. Inténtalo otra vez." : "Couldn't send. Try again."}</p>}
+              {state === "links" && <p role="alert" className="text-sm text-error">{es ? "Quita algunos enlaces e inténtalo otra vez." : "Please take out some of the links and try again."}</p>}
               {state === "too_many" && <p role="alert" className="text-sm text-error">{es ? "Ya enviaste muchas hoy. Pregunta a tu gerente." : "You've sent a lot today. Ask your manager."}</p>}
               <button disabled={state === "sending" || text.trim().length < 3} className="btn btn-primary btn-sm self-start">
                 {state === "sending" ? (es ? "Enviando..." : "Sending...") : es ? "Enviar pregunta" : "Send question"}

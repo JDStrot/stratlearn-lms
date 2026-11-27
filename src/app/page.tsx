@@ -34,6 +34,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ e
             <p className="mt-6 border-t border-line pt-4 text-center text-sm text-muted">
               Manager? <a href="/admin/login">Sign in to the manager console</a>
             </p>
+            <p className="mt-3 text-center text-xs text-muted">
+              By signing in you agree to the <a href="/terms">Terms</a> and <a href="/privacy">Privacy Policy</a>.{" "}
+              <a href="/help">Need help?</a>
+            </p>
           </section>
         </div>
       </main>

@@ -5,6 +5,7 @@ import { Logo } from "./logo";
 export function SiteFooter({ es = false }: { es?: boolean }) {
   const links = [
     { label: es ? "Mis cursos" : "My learning", href: "/learn" },
+    { label: es ? "Ayuda" : "Help", href: es ? "/help?lang=es" : "/help" },
     { label: es ? "Contáctanos" : "Contact us", href: "/contact" },
     { label: es ? "Para gerentes" : "Manager sign in", href: "/admin/login" },
   ];
@@ -21,9 +22,12 @@ export function SiteFooter({ es = false }: { es?: boolean }) {
             </li>
           ))}
         </ul>
-        <p className="border-t border-white/15 pt-5 text-sm text-[#efe7ff]/80">
-          © {new Date().getFullYear()} STRATLEARN Learning
-        </p>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-white/15 pt-5 text-sm text-[#efe7ff]/80">
+          <span>© {new Date().getFullYear()} STRATLEARN Learning</span>
+          <Link href="/terms" className="no-underline hover:text-white">{es ? "Términos" : "Terms"}</Link>
+          <Link href="/privacy" className="no-underline hover:text-white">{es ? "Privacidad" : "Privacy"}</Link>
+          <Link href="/client-agreement" className="no-underline hover:text-white">{es ? "Acuerdo de datos" : "Client data agreement"}</Link>
+        </div>
       </div>
     </footer>
   );

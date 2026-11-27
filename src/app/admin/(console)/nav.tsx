@@ -12,6 +12,7 @@ const LINKS = [
   ["/admin/questions", "Questions"],
   ["/admin/badges", "Print badges"],
   ["/admin/settings", "Team settings"],
+  ["/admin/help", "Help"],
 ] as const;
 
 export function AdminNav({ owner = false }: { owner?: boolean }) {
